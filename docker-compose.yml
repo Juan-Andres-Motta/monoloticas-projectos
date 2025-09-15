@@ -1,0 +1,126 @@
+services:
+  # PostgreSQL Database for Tracking Service
+  tracking-db:
+    image: postgres:16-alpine
+    container_name: ${TRACKING_DB_CONTAINER}
+    environment:
+      POSTGRES_DB: ${TRACKING_DB_NAME}
+      POSTGRES_USER: ${TRACKING_DB_USER}
+      POSTGRES_PASSWORD: ${TRACKING_DB_PASSWORD}
+    ports:
+      - "${TRACKING_DB_PORT}:5432"
+    volumes:
+      - tracking_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TRACKING_DB_USER} -d ${TRACKING_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+
+  # PostgreSQL Database for Commission Service  
+  commission-db:
+    image: postgres:16-alpine
+    container_name: ${COMMISSION_DB_CONTAINER}
+    environment:
+      POSTGRES_DB: ${COMMISSION_DB_NAME}
+      POSTGRES_USER: ${COMMISSION_DB_USER}
+      POSTGRES_PASSWORD: ${COMMISSION_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - commission_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COMMISSION_DB_USER} -d ${COMMISSION_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices
+
+  # Tracking Microservice
+  tracking-service:
+    build: 
+      context: ./tracking
+      dockerfile: Dockerfile
+    container_name: ${TRACKING_SERVICE_CONTAINER}
+    ports:
+      - "${TRACKING_SERVICE_PORT}:${TRACKING_SERVICE_PORT}"
+    environment:
+      - DATABASE_URL=${TRACKING_DATABASE_URL}
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE}
+      - PULSAR_TOPIC=${PULSAR_TOPIC}
+    depends_on:
+      tracking-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${TRACKING_SERVICE_PORT}/api/v1/tracking/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - microservices
+
+  # Commission Microservice
+  commission-service:
+    build:
+      context: ./comission
+      dockerfile: Dockerfile
+    container_name: ${COMMISSION_SERVICE_CONTAINER}
+    ports:
+      - "${COMMISSION_SERVICE_PORT}:${COMMISSION_SERVICE_PORT}"
+    environment:
+      - DATABASE_URL=${COMMISSION_DATABASE_URL}
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE}
+      - PULSAR_TOPIC=${PULSAR_TOPIC}
+    depends_on:
+      commission-db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${COMMISSION_SERVICE_PORT}/api/v1/commission/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - microservices
+
+  # Database Administration Tool
+  adminer:
+    image: adminer:4.8.1
+    container_name: ${ADMINER_CONTAINER}
+    ports:
+      - "${ADMINER_PORT}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: ${ADMINER_DEFAULT_SERVER}
+      ADMINER_DEFAULT_DB_DRIVER: ${ADMINER_DEFAULT_DB_DRIVER}
+    depends_on:
+      tracking-db:
+        condition: service_healthy
+      commission-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - microservices
+
+volumes:
+  tracking_data:
+    driver: local
+  commission_data:
+    driver: local
+
+networks:
+  microservices:
+    driver: bridge
