@@ -1,41 +1,70 @@
-# Microservices Project - Tracking, Commission & BFF
+# Microservices Project - Event-Driven Architecture
 
-This project contains three microservices connected via Apache Pulsar (DataStax Astra Streaming) for event-driven communication:
+This project demonstrates **two architectural patterns** for microservice communication:
 
-- **BFF Service**: Backend for Frontend providing unified API access with JWT authentication
-- **Tracking Service**: Records tracking events and publishes them to Pulsar
-- **Commission Service**: Consumes tracking events and calculates commissions
+## 🏗️ Architecture Patterns
 
-## Architecture
+### 1. Traditional HTTP-based (Original)
+- **Tracking Service**: HTTP API for recording tracking events
+- **Commission Service**: HTTP API for commission calculations  
+- **Campaign Service**: HTTP API for campaign management
+- **Payment Service**: HTTP API for payment processing
+
+### 2. Event-Driven with Avro Schemas (New)
+- **Services communicate via Pulsar topics** instead of HTTP calls
+- **Avro schemas** provide type safety and schema evolution
+- **Command events** trigger operations in specific services
+- **Domain events** notify when operations complete
+- **Correlation IDs** for tracking workflows across services
+
+## 🎯 Event-Driven Benefits
+
+✅ **Loose Coupling**: Services don't need to know about each other  
+✅ **Better Scalability**: Asynchronous processing improves performance  
+✅ **Fault Tolerance**: Services work independently  
+✅ **Type Safety**: Avro schemas prevent integration errors  
+✅ **Schema Evolution**: Backward/forward compatibility  
+✅ **Event Tracing**: Complete audit trail with correlation IDs
+
+## Event-Driven Architecture
 
 ```
-                                    ┌──────────────────┐
-                                    │  BFF Service     │
-                                    │  (Port 8002)     │
-                                    │  JWT Auth        │
-                                    └─────────┬────────┘
-                                              │ BFF Commands
-                                              ▼
-                                    ┌──────────────────┐
-                                    │  Apache Pulsar   │
-                                    │  (DataStax)      │
-                                    │  BFF Topics      │
-                                    └─────────┬────────┘
-                                              │ Integration Events
-                  ┌───────────────────────────┼───────────────────────────┐
-                  ▼                           ▼                           ▼
-┌─────────────────┐                 ┌──────────────────┐                ┌──────────────────┐
-│  Tracking       │────Events──────▶│  Commission      │                │  Future Services │
-│  Service        │    Pulsar       │  Service         │                │  (Campaign, etc) │
-│  (Port 8000)    │                 │  (Port 8001)     │                │                  │
-└─────────┬───────┘                 └─────────┬────────┘                └──────────────────┘
-          │                                   │
-          ▼                                   ▼
-┌─────────────────┐                 ┌──────────────────┐
-│  PostgreSQL     │                 │  PostgreSQL      │
-│  tracking-db    │                 │  commission-db   │
-│  (Port 5432)    │                 │  (Port 5433)     │
-└─────────────────┘                 └──────────────────┘
+                    📡 Apache Pulsar Topics 📡
+    ┌─────────────────────────────────────────────────────────┐
+    │                                                         │
+    │  campaign-commands  tracking-commands  commission-commands  │
+    │  campaign-events    tracking-events    commission-events    │
+    │                                                         │
+    └─────────────────────────────────────────────────────────┘
+                    ▲                           ▲
+                    │ Avro                     │ Avro  
+                    │ Messages                 │ Messages
+                    ▼                           ▼
+    ┌─────────────────┐                   ┌──────────────────┐
+    │  Campaign       │                   │  Commission      │
+    │  Service        │                   │  Service         │
+    │  (Event Mode)   │                   │  (Event Mode)    │
+    └─────────────────┘                   └──────────────────┘
+            │                                     │
+            ▼                                     ▼
+    ┌─────────────────┐                   ┌──────────────────┐
+    │  PostgreSQL     │                   │  PostgreSQL      │
+    │  campaign-db    │                   │  commission-db   │
+    └─────────────────┘                   └──────────────────┘
+                    ▲
+                    │ Commands & Events
+                    │
+    ┌─────────────────┐                   ┌──────────────────┐
+    │  Tracking       │                   │  Payment         │
+    │  Service        │                   │  Service         │
+    │  (Event Mode)   │                   │  (Event Mode)    │
+    └─────────────────┘                   └──────────────────┘
+            │                                     │
+            ▼                                     ▼
+    ┌─────────────────┐                   ┌──────────────────┐
+    │  PostgreSQL     │                   │  PostgreSQL      │
+    │  tracking-db    │                   │  payment-db      │
+    └─────────────────┘                   └──────────────────┘
 ```
 
 ## Quick Start
@@ -340,10 +369,78 @@ curl http://localhost:8001/api/v1/commission/health        # Commission
 - **Simplified Setup**: All services configured from one location
 - **Environment Template**: `.env.example` provides setup guidance
 - **Better Security**: `.gitignore` prevents committing sensitive data
-- **Container Ready**: Docker and Docker Compose for easy deployment
+- **Quick Scripts**: `start.sh` and `stop.sh` for easy management
 
-**Integration & Testing**:
-- **DataStax Astra Streaming**: Production-ready Pulsar integration
-- **Health Checks**: Comprehensive service monitoring
-- **JWT Generator**: Built-in token generation for testing
-- **Database Admin**: Adminer for database management
+## 🎯 Event-Driven Implementation Summary
+
+I've implemented a complete **event-driven microservices architecture** using **Apache Pulsar with Avro schemas**. Here's what was created:
+
+### 📋 Key Components Created
+
+1. **Avro Schema Definitions** (`messaging/schemas/avro_schemas.py`)
+   - Command schemas for triggering operations
+   - Domain event schemas for notifications
+   - Type-safe message structures with schema evolution
+
+2. **Event Publisher** (`messaging/avro_publisher.py`)
+   - Publishes commands to trigger operations in other services
+   - Publishes domain events when operations complete
+   - Uses Avro schemas for type safety
+
+3. **Event Consumer** (`messaging/avro_consumer.py`)
+   - Listens to command topics for each service
+   - Routes commands to appropriate handlers
+   - Handles message acknowledgment and error handling
+
+4. **Event Handlers** (`messaging/event_handlers.py`)
+   - Process commands received via events instead of HTTP
+   - Integrate with existing business logic
+   - Maintain correlation IDs for tracing
+
+5. **Service Modes**
+   - **HTTP Mode**: Traditional REST API endpoints
+   - **Event Mode**: Pure event-driven communication
+   - **Hybrid Mode**: Both HTTP and events supported
+
+### 🔄 Event Flow Examples
+
+**Traditional HTTP:**
+```
+Client → POST /campaigns → Campaign Service → POST /tracking → Tracking Service
+```
+
+**Event-Driven:**
+```
+Client → campaign.create.command.v1 → Campaign Service → campaign.created.v1 → Other Services
+```
+
+### 🚀 Benefits Achieved
+
+- ✅ **Loose Coupling**: Services communicate via events, not direct calls
+- ✅ **Type Safety**: Avro schemas prevent integration errors
+- ✅ **Scalability**: Asynchronous processing improves performance
+- ✅ **Resilience**: Services work even if others are down
+- ✅ **Traceability**: Correlation IDs track workflows across services
+- ✅ **Schema Evolution**: Backward/forward compatible message formats
+
+### 📖 Usage
+
+```bash
+# Test event-driven architecture
+python test_event_driven.py demo
+
+# Start service in event mode  
+export CAMPAIGN_SERVICE_MODE=event
+python main_event_driven.py
+
+# Start with Docker Compose
+docker-compose -f docker-compose.event-driven.yml up -d
+```
+
+### 📚 Documentation
+
+- [`EVENT_DRIVEN_GUIDE.md`](./EVENT_DRIVEN_GUIDE.md) - Complete implementation guide
+- [`test_event_driven.py`](./test_event_driven.py) - Demo script and examples
+- [`docker-compose.event-driven.yml`](./docker-compose.event-driven.yml) - Event-driven deployment
+
+This implementation demonstrates how to **transition from HTTP-based microservices to event-driven architecture** while maintaining backward compatibility and providing significant architectural improvements.

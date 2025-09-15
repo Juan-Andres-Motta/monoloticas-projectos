@@ -1,0 +1,241 @@
+# Event-Driven Microservices Docker Compose Configuration
+# This configuration runs all services in event-driven mode instead of HTTP endpoints
+
+version: '3.8'
+
+services:
+  # =================================================================
+  # DATABASES
+  # =================================================================
+  
+  tracking-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: trackingdb
+      POSTGRES_USER: tracking_user
+      POSTGRES_PASSWORD: tracking_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - tracking_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracking_user -d trackingdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  commission-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: commissiondb
+      POSTGRES_USER: commission_user
+      POSTGRES_PASSWORD: commission_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - commission_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commission_user -d commissiondb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  campaign-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: campaigndb
+      POSTGRES_USER: campaign_user
+      POSTGRES_PASSWORD: campaign_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - campaign_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campaign_user -d campaigndb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  payment-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: paymentdb
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_password
+    ports:
+      - "5435:5432"
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d paymentdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =================================================================
+  # EVENT-DRIVEN MICROSERVICES
+  # =================================================================
+
+  campaign-service:
+    build:
+      context: ./campaingn
+      dockerfile: Dockerfile
+    environment:
+      # Service Mode - Set to 'event' for pure event-driven or 'hybrid' for both
+      - CAMPAIGN_SERVICE_MODE=hybrid
+      - CAMPAIGN_SERVICE_PORT=8002
+      
+      # Database Configuration
+      - DATABASE_URL=postgresql://campaign_user:campaign_password@campaign-db:5432/campaigndb
+      
+      # Pulsar Configuration (DataStax Astra Streaming)
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT:-miso-1-2025}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE:-default}
+    ports:
+      - "8002:8002"  # HTTP API (if hybrid mode)
+    depends_on:
+      campaign-db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: python main_event_driven.py
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./campaingn:/app
+    working_dir: /app
+
+  tracking-service:
+    build:
+      context: ./tracking
+      dockerfile: Dockerfile
+    environment:
+      # Service Mode
+      - TRACKING_SERVICE_MODE=event
+      
+      # Database Configuration
+      - DATABASE_URL=postgresql://tracking_user:tracking_password@tracking-db:5432/trackingdb
+      
+      # Pulsar Configuration
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT:-miso-1-2025}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE:-default}
+    depends_on:
+      tracking-db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: python -c "from messaging.event_handlers import start_event_driven_tracking_service; import asyncio; asyncio.run(start_event_driven_tracking_service())"
+    volumes:
+      - ./tracking:/app
+    working_dir: /app
+
+  commission-service:
+    build:
+      context: ./comission
+      dockerfile: Dockerfile
+    environment:
+      # Service Mode
+      - COMMISSION_SERVICE_MODE=event
+      
+      # Database Configuration
+      - DATABASE_URL=postgresql://commission_user:commission_password@commission-db:5432/commissiondb
+      
+      # Pulsar Configuration
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT:-miso-1-2025}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE:-default}
+    depends_on:
+      commission-db:
+        condition: service_healthy
+    restart: unless-stopped
+    # TODO: Implement commission event handlers
+    command: echo "Commission service event handlers not yet implemented"
+    volumes:
+      - ./comission:/app
+    working_dir: /app
+
+  payment-service:
+    build:
+      context: ./payment
+      dockerfile: Dockerfile
+    environment:
+      # Service Mode
+      - PAYMENT_SERVICE_MODE=event
+      
+      # Database Configuration
+      - DATABASE_URL=postgresql://payment_user:payment_password@payment-db:5432/paymentdb
+      
+      # Pulsar Configuration
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT:-miso-1-2025}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE:-default}
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    restart: unless-stopped
+    # TODO: Implement payment event handlers
+    command: echo "Payment service event handlers not yet implemented"
+    volumes:
+      - ./payment:/app
+    working_dir: /app
+
+  # =================================================================
+  # UTILITIES
+  # =================================================================
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "9001:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: tracking-db
+
+  # Event-Driven Test Client
+  event-test-client:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.13-slim
+        WORKDIR /app
+        COPY . .
+        RUN pip install pulsar-client fastavro
+        CMD ["python", "test_event_driven.py", "help"]
+    environment:
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT:-miso-1-2025}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE:-default}
+    volumes:
+      - .:/app
+    working_dir: /app
+    profiles: ["test"]  # Only start when explicitly requested
+
+volumes:
+  tracking_db_data:
+  commission_db_data:
+  campaign_db_data:
+  payment_db_data:
+
+# =================================================================
+# USAGE INSTRUCTIONS
+# =================================================================
+
+# Start all services in event-driven mode:
+# docker-compose -f docker-compose.event-driven.yml up -d
+
+# Run event-driven tests:
+# docker-compose -f docker-compose.event-driven.yml --profile test run event-test-client python test_event_driven.py demo
+
+# View service logs:
+# docker-compose -f docker-compose.event-driven.yml logs -f campaign-service
+
+# Stop all services:
+# docker-compose -f docker-compose.event-driven.yml down
