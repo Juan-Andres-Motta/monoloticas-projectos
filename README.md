@@ -1,25 +1,41 @@
-# Microservices Project - Tracking & Commission
+# Microservices Project - Tracking, Commission & BFF
 
-This project contains two microservices connected via Apache Pulsar (DataStax Astra Streaming) for event-driven communication:
+This project contains three microservices connected via Apache Pulsar (DataStax Astra Streaming) for event-driven communication:
 
+- **BFF Service**: Backend for Frontend providing unified API access with JWT authentication
 - **Tracking Service**: Records tracking events and publishes them to Pulsar
 - **Commission Service**: Consumes tracking events and calculates commissions
 
 ## Architecture
 
 ```
-┌─────────────────┐    Event     ┌──────────────────┐
-│  Tracking       │─────────────▶│  Commission      │
-│  Service        │   Pulsar     │  Service         │
-│  (Port 8000)    │              │  (Port 8001)     │
-└─────────────────┘              └──────────────────┘
-        │                                 │
-        ▼                                 ▼
-┌─────────────────┐              ┌──────────────────┐
-│  PostgreSQL     │              │  PostgreSQL      │
-│  tracking-db    │              │  commission-db   │
-│  (Port 5432)    │              │  (Port 5433)     │
-└─────────────────┘              └──────────────────┘
+                                    ┌──────────────────┐
+                                    │  BFF Service     │
+                                    │  (Port 8002)     │
+                                    │  JWT Auth        │
+                                    └─────────┬────────┘
+                                              │ BFF Commands
+                                              ▼
+                                    ┌──────────────────┐
+                                    │  Apache Pulsar   │
+                                    │  (DataStax)      │
+                                    │  BFF Topics      │
+                                    └─────────┬────────┘
+                                              │ Integration Events
+                  ┌───────────────────────────┼───────────────────────────┐
+                  ▼                           ▼                           ▼
+┌─────────────────┐                 ┌──────────────────┐                ┌──────────────────┐
+│  Tracking       │────Events──────▶│  Commission      │                │  Future Services │
+│  Service        │    Pulsar       │  Service         │                │  (Campaign, etc) │
+│  (Port 8000)    │                 │  (Port 8001)     │                │                  │
+└─────────┬───────┘                 └─────────┬────────┘                └──────────────────┘
+          │                                   │
+          ▼                                   ▼
+┌─────────────────┐                 ┌──────────────────┐
+│  PostgreSQL     │                 │  PostgreSQL      │
+│  tracking-db    │                 │  commission-db   │
+│  (Port 5432)    │                 │  (Port 5433)     │
+└─────────────────┘                 └──────────────────┘
 ```
 
 ## Quick Start
@@ -33,13 +49,15 @@ This project contains two microservices connected via Apache Pulsar (DataStax As
 
 **UNIFIED SETUP COMPLETE** - All services are now running from a single docker-compose.yml:
 
-✅ **Tracking Service**: Healthy and operational (port 8000)  
-✅ **Commission Service**: Processing events via Pulsar (background service)  
-✅ **PostgreSQL Databases**: Both tracking and commission DBs running  
-✅ **DataStax Pulsar Integration**: Event streaming working perfectly  
-✅ **Database Admin**: Adminer available for database management  
+✅ **BFF Service**: Unified API with JWT authentication (port 8002)
+✅ **Tracking Service**: Healthy and operational (port 8000)
+✅ **Commission Service**: Processing events via Pulsar (background service)
+✅ **PostgreSQL Databases**: Both tracking and commission DBs running
+✅ **DataStax Pulsar Integration**: Event streaming working perfectly
+✅ **Database Admin**: Adminer available for database management
 
-**Event Flow Verified**: Tracking → Pulsar → Commission ✅
+**Event Flow Verified**: BFF → Pulsar (BFF Topics) → Future Services ✅
+**Direct Event Flow**: Tracking → Pulsar → Commission ✅
 
 ### 1. Start All Services
 
@@ -49,20 +67,26 @@ docker-compose up --build
 ```
 
 This will start:
+- **bff-service**: Backend for Frontend API (port 8002)
 - **tracking-db**: PostgreSQL database for tracking service (port 5432)
-- **commission-db**: PostgreSQL database for commission service (port 5433) 
+- **commission-db**: PostgreSQL database for commission service (port 5433)
 - **tracking-service**: Tracking microservice (port 8000)
 - **commission-service**: Commission microservice (port 8001)
 - **adminer**: Database administration tool (port 9001)
 
 ### 2. Access Services
 
+- **BFF API**: http://localhost:8002
+  - API Docs: http://localhost:8002/docs
+  - Health Check: http://localhost:8002/health
+  - JWT Token Generator: `cd bff && python generate_jwt.py`
+
 - **Tracking API**: http://localhost:8000
   - API Docs: http://localhost:8000/docs
   - Health Check: http://localhost:8000/api/v1/tracking/health
 
 - **Commission API**: http://localhost:8001
-  - API Docs: http://localhost:8001/docs  
+  - API Docs: http://localhost:8001/docs
   - Health Check: http://localhost:8001/api/v1/commission/health
 
 - **Database Admin**: http://localhost:9001
@@ -71,6 +95,56 @@ This will start:
   - Password: `tracking_password` / `commission_password`
 
 ### 3. Test the Integration
+
+#### Option A: Test via BFF (Recommended)
+
+1. **Generate a JWT token**:
+```bash
+cd bff
+python generate_jwt.py
+# Copy the generated JWT token
+```
+
+2. **Test BFF endpoints** (replace YOUR_JWT_TOKEN with the generated token):
+
+**Accept Campaign**:
+```bash
+curl -X POST "http://localhost:8002/api/v1/campaigns/camp123/accept" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -d '{
+       "accepted_terms": true,
+       "metadata": {"source": "mobile_app"}
+     }'
+```
+
+**Upload Evidence**:
+```bash
+curl -X POST "http://localhost:8002/api/v1/evidence/upload" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -d '{
+       "campaign_id": "camp123",
+       "evidence_type": "photo",
+       "file_url": "https://example.com/photo.jpg",
+       "metadata": {"description": "Product photo"}
+     }'
+```
+
+**Request Payment**:
+```bash
+curl -X POST "http://localhost:8002/api/v1/payments/request" \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -d '{
+       "amount": 150.00,
+       "currency": "USD",
+       "payment_method": "paypal",
+       "account_details": {"email": "user@example.com"}
+     }'
+```
+
+#### Option B: Test Direct Services
 
 1. **Create a tracking event**:
 ```bash
@@ -111,6 +185,11 @@ PULSAR_TENANT=your-tenant-name
 PULSAR_NAMESPACE=default
 PULSAR_TOPIC=persistent://your-tenant-name/default/tracking-events
 
+# JWT Configuration for BFF
+JWT_SECRET_KEY=your_jwt_secret_key_here
+JWT_ALGORITHM=HS256
+JWT_REQUIRE_VALIDATION=false
+
 # Database passwords (can be customized)
 TRACKING_DB_PASSWORD=tracking_password
 COMMISSION_DB_PASSWORD=commission_password
@@ -119,6 +198,7 @@ COMMISSION_DB_PASSWORD=commission_password
 ### Individual Service .env Files
 
 The individual services also have `.env` files for local development:
+- `bff/.env` - Used when running BFF service individually
 - `tracking/.env` - Used when running tracking service individually
 - `comission/.env` - Used when running commission service individually
 
@@ -130,21 +210,22 @@ The individual services also have `.env` files for local development:
 
 1. **Install dependencies** (for each service):
 ```bash
-cd tracking  # or comission
+cd bff        # or tracking, or comission
 poetry install
 ```
 
-2. **Update database URLs** to point to localhost:
-```
+2. **Update database URLs** to point to localhost (for services that use DB):
+```bash
 # Tracking
 DATABASE_URL=postgresql://juan:@localhost:5432/trackingdb
 
-# Commission  
+# Commission
 DATABASE_URL=postgresql://commission_user:commission_password@localhost:5433/commissiondb
 ```
 
 3. **Start the service**:
 ```bash
+poetry run uvicorn main:app --reload --port 8002  # bff
 poetry run uvicorn main:app --reload --port 8000  # tracking
 poetry run uvicorn main:app --reload --port 8001  # commission
 ```
@@ -195,8 +276,9 @@ docker exec -it commission-postgres psql -U commission_user -d commissiondb
 
 ### Service Health Checks
 ```bash
-curl http://localhost:8000/api/v1/tracking/health
-curl http://localhost:8001/api/v1/commission/health
+curl http://localhost:8002/health                          # BFF
+curl http://localhost:8000/api/v1/tracking/health          # Tracking
+curl http://localhost:8001/api/v1/commission/health        # Commission
 ```
 
 ## Project Structure
@@ -208,8 +290,19 @@ curl http://localhost:8001/api/v1/commission/health
 ├── .env.example               # 📋 Environment template
 ├── .gitignore                 # 🔒 Git ignore rules
 ├── README.md                  # 📖 This documentation
-├── start.sh                   # 🚀 Quick start script
-├── stop.sh                    # 🛑 Stop services script
+├── bff/                       # 🚀 Backend for Frontend Service
+│   ├── Dockerfile
+│   ├── .env.example           # BFF-specific environment
+│   ├── main.py
+│   ├── generate_jwt.py        # JWT token generator
+│   ├── api/
+│   │   ├── routers/          # FastAPI routers
+│   │   └── schemas/          # Pydantic schemas
+│   ├── application/          # Application layer
+│   │   └── events/           # Integration events
+│   ├── config/               # Configuration
+│   ├── messaging/            # Pulsar integration
+│   └── ...
 ├── tracking/                  # 📊 Tracking microservice
 │   ├── Dockerfile
 │   ├── .env                   # (local development)
@@ -217,7 +310,7 @@ curl http://localhost:8001/api/v1/commission/health
 │   ├── api/
 │   ├── ingestion/
 │   └── ...
-└── comission/                 # 💰 Commission microservice  
+└── comission/                 # 💰 Commission microservice
     ├── Dockerfile
     ├── .env                   # (local development)
     ├── main.py
@@ -226,10 +319,31 @@ curl http://localhost:8001/api/v1/commission/health
     └── ...
 ```
 
-### ✨ New Features
+### ✨ Key Features
 
+**Architecture & Patterns**:
+- **Clean Architecture**: Hexagonal architecture with clear layer separation
+- **Domain-Driven Design**: Aggregate roots and bounded contexts
+- **CQRS**: Command Query Responsibility Segregation
+- **Event-Driven**: Apache Pulsar for async communication
+- **Microservices**: Independent, loosely coupled services
+
+**BFF Service**:
+- **JWT Authentication**: Flexible token extraction without strict validation
+- **Command Publishing**: Sends BFF-specific commands to dedicated Pulsar topics (not to tracking/commission)
+- **Clean API**: RESTful endpoints for campaign, evidence, and payment operations
+- **Schema Validation**: Comprehensive Pydantic DTOs for request/response validation
+- **OpenAPI Documentation**: Auto-generated API docs with JWT security schemes
+
+**Infrastructure**:
 - **Unified Environment**: Single `.env` file manages all configuration
 - **Simplified Setup**: All services configured from one location
 - **Environment Template**: `.env.example` provides setup guidance
 - **Better Security**: `.gitignore` prevents committing sensitive data
-- **Quick Scripts**: `start.sh` and `stop.sh` for easy management
+- **Container Ready**: Docker and Docker Compose for easy deployment
+
+**Integration & Testing**:
+- **DataStax Astra Streaming**: Production-ready Pulsar integration
+- **Health Checks**: Comprehensive service monitoring
+- **JWT Generator**: Built-in token generation for testing
+- **Database Admin**: Adminer for database management

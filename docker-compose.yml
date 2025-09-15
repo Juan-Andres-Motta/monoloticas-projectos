@@ -97,6 +97,35 @@ services:
     networks:
       - microservices
 
+  # BFF (Backend for Frontend) Service
+  bff-service:
+    build:
+      context: ./bff
+      dockerfile: Dockerfile
+    container_name: ${BFF_SERVICE_CONTAINER}
+    ports:
+      - "${BFF_SERVICE_PORT}:${BFF_SERVICE_PORT}"
+    environment:
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - JWT_REQUIRE_VALIDATION=${JWT_REQUIRE_VALIDATION}
+      - API_HOST=${BFF_API_HOST}
+      - API_PORT=${BFF_SERVICE_PORT}
+      - LOG_LEVEL=${BFF_LOG_LEVEL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${BFF_SERVICE_PORT}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - microservices
+
   # Database Administration Tool
   adminer:
     image: adminer:4.8.1

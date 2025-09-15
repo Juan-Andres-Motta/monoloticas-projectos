@@ -1,0 +1,21 @@
+[project]
+name = "alpes-partners-bff"
+version = "0.1.0"
+description = "Backend for Frontend service for Alpes Partners platform"
+authors = [
+    {name = "Your Name", email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[all] (>=0.116.1,<0.117.0)",
+    "uvicorn[standard] (>=0.35.0,<0.36.0)",
+    "pydantic (>=2.0.0,<3.0.0)",
+    "pulsar-client (>=3.8.0,<4.0.0)",
+    "PyJWT (>=2.8.0,<3.0.0)",
+    "python-dotenv (>=1.1.1,<2.0.0)"
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
