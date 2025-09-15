@@ -118,7 +118,7 @@ services:
     ports:
       - "${BFF_SERVICE_PORT}:${BFF_SERVICE_PORT}"
     restart: unless-stopped
-    command: python -m uvicorn main_simple:app --host 0.0.0.0 --port ${BFF_SERVICE_PORT}
+    command: python -m uvicorn main:app --host 0.0.0.0 --port ${BFF_SERVICE_PORT}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:${BFF_SERVICE_PORT}/health || exit 1"]
       interval: 30s

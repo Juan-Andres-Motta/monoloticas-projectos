@@ -16,15 +16,15 @@ class PulsarConfig:
     TENANT = os.getenv("PULSAR_TENANT", "miso-1-2025")
     NAMESPACE = os.getenv("PULSAR_NAMESPACE", "default")
 
-    # BFF Command Topics (specific to operations)
-    CAMPAIGN_ACCEPT_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/bff-campaign-accept-v1"
-    CAMPAIGN_ACCEPT_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/bff-campaign-accept-responses-v1"
+    # BFF Command Topics (mapping to actual Pulsar topics)
+    CAMPAIGN_ACCEPT_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/campaign-commands"
+    CAMPAIGN_ACCEPT_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/campaign-events"
 
-    EVIDENCE_UPLOAD_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/bff-evidence-upload-v1"
-    EVIDENCE_UPLOAD_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/bff-evidence-upload-responses-v1"
+    EVIDENCE_UPLOAD_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/tracking-commands"  
+    EVIDENCE_UPLOAD_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/tracking-events"
 
-    PAYMENT_REQUEST_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/bff-payment-request-v1"
-    PAYMENT_REQUEST_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/bff-payment-request-responses-v1"
+    PAYMENT_REQUEST_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/payment-commands"
+    PAYMENT_REQUEST_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/payment-events"
 
     # Consumer subscriptions
     BFF_RESPONSES_SUBSCRIPTION = "bff-responses-subscription"

@@ -71,8 +71,10 @@ class PulsarResponseConsumer:
 
         while self._running:
             try:
-                # Receive message with timeout
-                msg = consumer.receive(timeout_millis=2000)
+                # Run the synchronous receive in a thread pool to avoid blocking
+                msg = await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: consumer.receive(timeout_millis=2000)
+                )
 
                 # Process response message
                 await self._process_response_message(topic, msg)
