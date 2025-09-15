@@ -1,7 +1,6 @@
 # Event-Driven Microservices Docker Compose Configuration
 # This configuration runs all services in event-driven mode instead of HTTP endpoints
 
-version: '3.8'
 
 services:
   # =================================================================
