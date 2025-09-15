@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 # Import routers but comment out Pulsar imports for now
 from api.routers.campaign_router import create_campaign_router
-from api.routers.evidence_router import create_evidence_router  
+from api.routers.evidence_router import create_evidence_router
 from api.routers.payment_router import create_payment_router
 
 # from messaging.pulsar_command_publisher import pulsar_command_publisher
@@ -15,7 +15,7 @@ from api.routers.payment_router import create_payment_router
 async def lifespan(app: FastAPI):
     # Startup logic
     print("🚀 Starting BFF Service...")
-    
+
     # Disable Pulsar for now - just set mock state
     app.state.pulsar_publisher = None
     app.state.pulsar_consumer_tasks = []
@@ -31,12 +31,12 @@ app = FastAPI(
     title="Alpes Partners BFF",
     description="Backend for Frontend service for Alpes Partners platform",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add routers (they already have /api/v1 prefix)
 app.include_router(create_campaign_router())
-app.include_router(create_evidence_router()) 
+app.include_router(create_evidence_router())
 app.include_router(create_payment_router())
 
 
@@ -46,20 +46,17 @@ async def root():
     return {
         "message": "Welcome to Alpes Partners BFF",
         "version": "1.0.0",
-        "status": "running"
+        "status": "running",
     }
 
 
 @app.get("/health", tags=["health"])
 async def health_check():
     """Global health check"""
-    return {
-        "status": "healthy",
-        "service": "bff-service",
-        "version": "1.0.0"
-    }
+    return {"status": "healthy", "service": "bff-service", "version": "1.0.0"}
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001)
