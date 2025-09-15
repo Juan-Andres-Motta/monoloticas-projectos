@@ -231,14 +231,7 @@ services:
 
   # Event-Driven Test Client
   event-test-client:
-    build:
-      context: .
-      dockerfile_inline: |
-        FROM python:3.13-slim
-        WORKDIR /app
-        COPY . .
-        RUN pip install pulsar-client fastavro
-        CMD ["python", "test_event_driven.py", "help"]
+    image: python:3.13-slim
     environment:
       - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
       - PULSAR_TOKEN=${PULSAR_TOKEN}
@@ -247,6 +240,7 @@ services:
     volumes:
       - .:/app
     working_dir: /app
+    command: bash -c "pip install pulsar-client fastavro && python test_event_driven.py help"
     profiles: ["test"]  # Only start when explicitly requested
 
 volumes:

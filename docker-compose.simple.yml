@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Database for tracking service
+  tracking-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: trackingdb
+      POSTGRES_USER: tracking_user
+      POSTGRES_PASSWORD: tracking_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - tracking_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tracking_user -d trackingdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # BFF Service - Receives HTTP requests and publishes to Pulsar
+  bff-service:
+    build:
+      context: ./bff
+      dockerfile: Dockerfile
+    environment:
+      - BFF_SERVICE_PORT=8001
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT:-miso-1-2025}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE:-default}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-simple-secret-key}
+      - JWT_ALGORITHM=HS256
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    command: python -m uvicorn simple_main:app --host 0.0.0.0 --port 8001
+    volumes:
+      - ./bff:/app
+    working_dir: /app
+
+  # Tracking Service - Listens to Pulsar and creates DB records
+  tracking-service:
+    build:
+      context: ./tracking
+      dockerfile: Dockerfile
+    environment:
+      - TRACKING_SERVICE_MODE=event
+      - DATABASE_URL=postgresql://tracking_user:tracking_password@tracking-db:5432/trackingdb
+      - PULSAR_SERVICE_URL=${PULSAR_SERVICE_URL}
+      - PULSAR_TOKEN=${PULSAR_TOKEN}
+      - PULSAR_TENANT=${PULSAR_TENANT:-miso-1-2025}
+      - PULSAR_NAMESPACE=${PULSAR_NAMESPACE:-default}
+    depends_on:
+      tracking-db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: python simple_consumer.py
+    volumes:
+      - ./tracking:/app
+    working_dir: /app
+
+  # Adminer - Database administration tool
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: tracking-db
+      ADMINER_DESIGN: pepa-linha
+    depends_on:
+      - tracking-db
+
+volumes:
+  tracking_db_data:
