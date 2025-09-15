@@ -18,6 +18,7 @@ sys.path.append("/Users/juan/Desktop/uniandes/monoliticas/comission")
 try:
     # Try to import Pulsar publisher from tracking service
     from messaging.pulsar_publisher import PulsarPublisher
+
     TRACKING_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️  Could not import tracking Pulsar publisher: {e}")
@@ -27,6 +28,7 @@ try:
     # Try to import commission consumer
     from infrastructure.messaging.pulsar_consumer import PulsarConsumer
     from config.container import Container
+
     COMMISSION_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️  Could not import commission components: {e}")
@@ -52,14 +54,18 @@ class EventFlowDebugger:
         pulsar_namespace = os.getenv("PULSAR_NAMESPACE", "default")
 
         print(f"PULSAR_SERVICE_URL: {'✅ Set' if pulsar_url else '❌ Missing'}")
-        print(f"PULSAR_TOKEN: {'✅ Set (' + pulsar_token[:20] + '...)' if pulsar_token and pulsar_token != 'YOUR_PULSAR_TOKEN' else '❌ Missing or default'}")
+        print(
+            f"PULSAR_TOKEN: {'✅ Set (' + pulsar_token[:20] + '...)' if pulsar_token and pulsar_token != 'YOUR_PULSAR_TOKEN' else '❌ Missing or default'}"
+        )
         print(f"PULSAR_TENANT: {pulsar_tenant}")
         print(f"PULSAR_NAMESPACE: {pulsar_namespace}")
 
         if not pulsar_url or not pulsar_token or pulsar_token == "YOUR_PULSAR_TOKEN":
             print("\n❌ Pulsar configuration is incomplete!")
             print("Please set the following environment variables:")
-            print("  export PULSAR_SERVICE_URL='pulsar+ssl://pulsar-aws-useast2.streaming.datastax.com:6651'")
+            print(
+                "  export PULSAR_SERVICE_URL='pulsar+ssl://pulsar-aws-useast2.streaming.datastax.com:6651'"
+            )
             print("  export PULSAR_TOKEN='your-actual-token-here'")
             return False
 
@@ -87,7 +93,7 @@ class EventFlowDebugger:
                 partner_id="test-partner-123",
                 campaign_id="test-campaign-456",
                 visitor_id="test-visitor-789",
-                interaction_type="test_click"
+                interaction_type="test_click",
             )
             print(f"✅ Test tracking event published: {test_event_id}")
             return True
@@ -109,11 +115,11 @@ class EventFlowDebugger:
             # Initialize commission service container
             container = Container()
             command_bus = container.get("command_bus")
-            
+
             self.commission_consumer = PulsarConsumer(command_bus)
-            
+
             print("✅ Commission consumer initialized")
-            
+
             # Note: We won't start the consumer loop here as it's blocking
             print("ℹ️  Consumer is ready to start (not starting loop in debug mode)")
             return True
@@ -136,18 +142,20 @@ class EventFlowDebugger:
             if self.tracking_publisher:
                 test_event_id = uuid4()
                 print(f"📤 Publishing test event: {test_event_id}")
-                
+
                 await self.tracking_publisher.publish_tracking_event(
                     tracking_event_id=test_event_id,
                     partner_id="e2e-partner-123",
-                    campaign_id="e2e-campaign-456", 
+                    campaign_id="e2e-campaign-456",
                     visitor_id="e2e-visitor-789",
-                    interaction_type="e2e_conversion"
+                    interaction_type="e2e_conversion",
                 )
 
                 print("✅ Event published successfully")
                 print("ℹ️  To verify consumption, check commission service logs")
-                print("ℹ️  Or start commission service with: python main_event_driven.py")
+                print(
+                    "ℹ️  Or start commission service with: python main_event_driven.py"
+                )
 
                 return True
             else:
@@ -161,7 +169,7 @@ class EventFlowDebugger:
     async def cleanup(self):
         """Clean up resources"""
         print("\n🧹 Cleaning up...")
-        
+
         if self.tracking_publisher:
             try:
                 await self.tracking_publisher.stop()
@@ -202,7 +210,9 @@ class EventFlowDebugger:
             if config_ok and tracking_ok and commission_ok:
                 print("\n🎉 All components working!")
                 print("💡 To test full flow:")
-                print("   1. Start commission service: cd comission && python main_event_driven.py")
+                print(
+                    "   1. Start commission service: cd comission && python main_event_driven.py"
+                )
                 print("   2. Make HTTP request to tracking service")
                 print("   3. Check commission service logs for received events")
             else:

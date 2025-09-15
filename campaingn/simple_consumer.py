@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple Pulsar Consumer for Tracking Service
-Listens to tracking events and creates database records
+Simple Pulsar Consumer for Campaign Service
+Listens to campaign events and creates database records
 """
 
 import asyncio
@@ -9,9 +9,9 @@ import json
 import os
 import sys
 import pulsar
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, DateTime, text
+from sqlalchemy import create_engine, Column, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -19,32 +19,31 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 # Database setup
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://tracking_user:tracking_password@localhost:5433/trackingdb",
+    "postgresql://campaign_user:campaign_password@localhost:5436/campaigndb",
 )
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-class TrackingEvent(Base):
-    __tablename__ = "tracking_events"
+class Campaign(Base):
+    __tablename__ = "campaigns"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    campaign_id = Column(String, nullable=False, unique=True)
+    name = Column(String, nullable=False)
+    description = Column(Text)
     partner_id = Column(String, nullable=False)
-    campaign_id = Column(String, nullable=False)
-    visitor_id = Column(String, nullable=False)
-    interaction_type = Column(String, nullable=False)
-    source_url = Column(String)
-    destination_url = Column(String)
+    status = Column(String, default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # Create tables
-print("🗄️ Creating database tables...")
+print("🗄️ Creating campaign database tables...")
 Base.metadata.create_all(bind=engine)
 
 
-class SimplePulsarConsumer:
+class SimpleCampaignConsumer:
     def __init__(self):
         self.client = None
         self.consumer = None
@@ -66,11 +65,11 @@ class SimplePulsarConsumer:
                 service_url, authentication=pulsar.AuthenticationToken(token)
             )
 
-            # Try different topic variations
+            # Try different topic variations for campaigns
             topics = [
-                f"persistent://{tenant}/{namespace}/tracking-events",
-                f"persistent://public/default/tracking-events",
-                f"non-persistent://{tenant}/{namespace}/tracking-events",
+                f"persistent://{tenant}/{namespace}/campaign-events",
+                f"persistent://public/default/campaign-events",
+                f"non-persistent://{tenant}/{namespace}/campaign-events",
             ]
 
             for topic in topics:
@@ -78,7 +77,7 @@ class SimplePulsarConsumer:
                     print(f"📡 Attempting to subscribe to: {topic}")
                     self.consumer = self.client.subscribe(
                         topic,
-                        subscription_name="tracking-service-consumer",
+                        subscription_name="campaign-service-consumer",
                         consumer_type=pulsar.ConsumerType.Shared,
                     )
                     print(f"✅ Successfully subscribed to: {topic}")
@@ -88,15 +87,15 @@ class SimplePulsarConsumer:
                     continue
 
             if not self.consumer:
-                raise Exception("Failed to subscribe to any topic")
+                raise Exception("Failed to subscribe to any campaign topic")
 
         except Exception as e:
-            print(f"❌ Failed to start consumer: {e}")
+            print(f"❌ Failed to start campaign consumer: {e}")
             raise
 
     async def consume_messages(self):
         """Consume and process messages"""
-        print("🎧 Starting to consume messages...")
+        print("🎧 Starting to consume campaign messages...")
 
         while True:
             try:
@@ -113,7 +112,7 @@ class SimplePulsarConsumer:
                 print(".", end="", flush=True)  # Show we're still listening
                 continue
             except Exception as e:
-                print(f"\n❌ Error processing message: {e}")
+                print(f"\n❌ Error processing campaign message: {e}")
                 await asyncio.sleep(1)
 
     async def process_message(self, msg):
@@ -121,28 +120,26 @@ class SimplePulsarConsumer:
         try:
             # Parse message
             data = json.loads(msg.data().decode("utf-8"))
-            print(f"\n📨 Received tracking event: {data}")
+            print(f"\n📨 Received campaign event: {data}")
 
             # Create database session
             db = SessionLocal()
 
             try:
-                # Create tracking event record
-                tracking_event = TrackingEvent(
-                    id=UUID(data.get("tracking_event_id", data.get("id"))),
-                    partner_id=data["partner_id"],
-                    campaign_id=data["campaign_id"],
-                    visitor_id=data["visitor_id"],
-                    interaction_type=data["interaction_type"],
-                    source_url=data.get("source_url"),
-                    destination_url=data.get("destination_url"),
+                # Create campaign record
+                campaign = Campaign(
+                    campaign_id=data.get("campaign_id", str(uuid4())),
+                    name=data.get("name", "Unnamed Campaign"),
+                    description=data.get("description", ""),
+                    partner_id=data.get("partner_id", "unknown"),
+                    status=data.get("status", "active"),
                     created_at=datetime.utcnow(),
                 )
 
-                db.add(tracking_event)
+                db.add(campaign)
                 db.commit()
 
-                print(f"✅ Created tracking record: {tracking_event.id}")
+                print(f"✅ Created campaign record: {campaign.campaign_id}")
 
             except Exception as e:
                 db.rollback()
@@ -152,7 +149,7 @@ class SimplePulsarConsumer:
                 db.close()
 
         except Exception as e:
-            print(f"❌ Error processing message: {e}")
+            print(f"❌ Error processing campaign message: {e}")
             raise
 
     async def stop(self):
@@ -165,9 +162,9 @@ class SimplePulsarConsumer:
 
 async def main():
     """Main function"""
-    print("🚀 Starting Simple Tracking Service Consumer")
+    print("🚀 Starting Simple Campaign Service Consumer")
 
-    consumer = SimplePulsarConsumer()
+    consumer = SimpleCampaignConsumer()
 
     try:
         await consumer.start()

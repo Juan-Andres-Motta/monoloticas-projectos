@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple Pulsar Consumer for Tracking Service
-Listens to tracking events and creates database records
+Simple Pulsar Consumer for Payment Service
+Listens to payment events and creates database records
 """
 
 import asyncio
@@ -9,42 +9,47 @@ import json
 import os
 import sys
 import pulsar
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
-from sqlalchemy import create_engine, Column, String, DateTime, text
+from decimal import Decimal
+from sqlalchemy import create_engine, Column, String, DateTime, Numeric
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
-# Database setup
+# Database setup - Use psycopg2 URL format
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://tracking_user:tracking_password@localhost:5433/trackingdb",
+    "postgresql://payment_user:payment_password@localhost:5437/paymentdb",
 )
-engine = create_engine(DATABASE_URL)
+# Convert asyncpg URL to psycopg2 format if needed
+if DATABASE_URL.startswith("postgresql+asyncpg://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+
+engine = create_engine(DATABASE_URL + "?client_encoding=utf8")
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-class TrackingEvent(Base):
-    __tablename__ = "tracking_events"
+class Payment(Base):
+    __tablename__ = "payments"
 
-    id = Column(PGUUID(as_uuid=True), primary_key=True)
+    id = Column(PGUUID(as_uuid=True), primary_key=True, default=uuid4)
+    payment_id = Column(String, nullable=False, unique=True)
     partner_id = Column(String, nullable=False)
-    campaign_id = Column(String, nullable=False)
-    visitor_id = Column(String, nullable=False)
-    interaction_type = Column(String, nullable=False)
-    source_url = Column(String)
-    destination_url = Column(String)
+    amount = Column(Numeric(10, 2), nullable=False)
+    currency = Column(String, default="USD")
+    status = Column(String, default="pending")
+    description = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # Create tables
-print("🗄️ Creating database tables...")
+print("🗄️ Creating payment database tables...")
 Base.metadata.create_all(bind=engine)
 
 
-class SimplePulsarConsumer:
+class SimplePaymentConsumer:
     def __init__(self):
         self.client = None
         self.consumer = None
@@ -66,11 +71,11 @@ class SimplePulsarConsumer:
                 service_url, authentication=pulsar.AuthenticationToken(token)
             )
 
-            # Try different topic variations
+            # Try different topic variations for payments
             topics = [
-                f"persistent://{tenant}/{namespace}/tracking-events",
-                f"persistent://public/default/tracking-events",
-                f"non-persistent://{tenant}/{namespace}/tracking-events",
+                f"persistent://{tenant}/{namespace}/payment-events",
+                f"persistent://public/default/payment-events",
+                f"non-persistent://{tenant}/{namespace}/payment-events",
             ]
 
             for topic in topics:
@@ -78,7 +83,7 @@ class SimplePulsarConsumer:
                     print(f"📡 Attempting to subscribe to: {topic}")
                     self.consumer = self.client.subscribe(
                         topic,
-                        subscription_name="tracking-service-consumer",
+                        subscription_name="payment-service-consumer",
                         consumer_type=pulsar.ConsumerType.Shared,
                     )
                     print(f"✅ Successfully subscribed to: {topic}")
@@ -88,15 +93,15 @@ class SimplePulsarConsumer:
                     continue
 
             if not self.consumer:
-                raise Exception("Failed to subscribe to any topic")
+                raise Exception("Failed to subscribe to any payment topic")
 
         except Exception as e:
-            print(f"❌ Failed to start consumer: {e}")
+            print(f"❌ Failed to start payment consumer: {e}")
             raise
 
     async def consume_messages(self):
         """Consume and process messages"""
-        print("🎧 Starting to consume messages...")
+        print("🎧 Starting to consume payment messages...")
 
         while True:
             try:
@@ -113,7 +118,7 @@ class SimplePulsarConsumer:
                 print(".", end="", flush=True)  # Show we're still listening
                 continue
             except Exception as e:
-                print(f"\n❌ Error processing message: {e}")
+                print(f"\n❌ Error processing payment message: {e}")
                 await asyncio.sleep(1)
 
     async def process_message(self, msg):
@@ -121,28 +126,27 @@ class SimplePulsarConsumer:
         try:
             # Parse message
             data = json.loads(msg.data().decode("utf-8"))
-            print(f"\n📨 Received tracking event: {data}")
+            print(f"\n📨 Received payment event: {data}")
 
             # Create database session
             db = SessionLocal()
 
             try:
-                # Create tracking event record
-                tracking_event = TrackingEvent(
-                    id=UUID(data.get("tracking_event_id", data.get("id"))),
-                    partner_id=data["partner_id"],
-                    campaign_id=data["campaign_id"],
-                    visitor_id=data["visitor_id"],
-                    interaction_type=data["interaction_type"],
-                    source_url=data.get("source_url"),
-                    destination_url=data.get("destination_url"),
+                # Create payment record
+                payment = Payment(
+                    payment_id=data.get("payment_id", str(uuid4())),
+                    partner_id=data.get("partner_id", "unknown"),
+                    amount=Decimal(str(data.get("amount", "0.00"))),
+                    currency=data.get("currency", "USD"),
+                    status=data.get("status", "pending"),
+                    description=data.get("description", ""),
                     created_at=datetime.utcnow(),
                 )
 
-                db.add(tracking_event)
+                db.add(payment)
                 db.commit()
 
-                print(f"✅ Created tracking record: {tracking_event.id}")
+                print(f"✅ Created payment record: {payment.payment_id}")
 
             except Exception as e:
                 db.rollback()
@@ -152,7 +156,7 @@ class SimplePulsarConsumer:
                 db.close()
 
         except Exception as e:
-            print(f"❌ Error processing message: {e}")
+            print(f"❌ Error processing payment message: {e}")
             raise
 
     async def stop(self):
@@ -165,9 +169,9 @@ class SimplePulsarConsumer:
 
 async def main():
     """Main function"""
-    print("🚀 Starting Simple Tracking Service Consumer")
+    print("🚀 Starting Simple Payment Service Consumer")
 
-    consumer = SimplePulsarConsumer()
+    consumer = SimplePaymentConsumer()
 
     try:
         await consumer.start()

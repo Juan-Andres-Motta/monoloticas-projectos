@@ -48,7 +48,9 @@ async def lifespan(app: FastAPI):
             app.state.consumer_task = consumer_task
         except Exception as e:
             logger.warning(f"⚠️  Pulsar consumer failed to start: {e}")
-            logger.info("🔄 Service will continue without event consumption from Pulsar")
+            logger.info(
+                "🔄 Service will continue without event consumption from Pulsar"
+            )
             app.state.consumer_task = None
 
         logger.info("✅ Commission Service initialization completed")
@@ -60,7 +62,7 @@ async def lifespan(app: FastAPI):
     finally:
         # Cleanup on shutdown
         logger.info("🛑 Commission Service shutting down...")
-        consumer_task = getattr(app.state, 'consumer_task', None)
+        consumer_task = getattr(app.state, "consumer_task", None)
         if consumer_task:
             consumer_task.cancel()
 
@@ -95,12 +97,14 @@ async def start_http_mode():
 
     # Add commission router
     from api.routers.commission_router import create_commission_router
+
     app.include_router(create_commission_router())
 
     # Start server
     import uvicorn
+
     port = int(os.getenv("COMMISSION_SERVICE_PORT", 8004))
-    
+
     logger.info(f"🚀 Commission Service HTTP API available at http://localhost:{port}")
     logger.info(f"📖 API Documentation: http://localhost:{port}/docs")
 
@@ -123,11 +127,13 @@ async def start_event_driven_mode():
         try:
             consumer_task = await start_pulsar_consumer(container)
             logger.info("✅ Pulsar consumer started successfully")
-            logger.info("🎧 Commission Service is now listening for tracking events from Pulsar")
-            
+            logger.info(
+                "🎧 Commission Service is now listening for tracking events from Pulsar"
+            )
+
             # Wait for the consumer task to complete (it runs indefinitely)
             await consumer_task
-            
+
         except Exception as e:
             logger.error(f"❌ Pulsar consumer failed to start: {e}")
             logger.error("💡 Make sure PULSAR_TOKEN is set and Pulsar is accessible")
@@ -148,7 +154,7 @@ async def start_hybrid_mode():
     app = FastAPI(
         title="Commission Service",
         description="Event-driven Commission microservice for affiliate marketing platform",
-        version="1.0.0", 
+        version="1.0.0",
         lifespan=lifespan,
     )
 
@@ -170,10 +176,12 @@ async def start_hybrid_mode():
 
     # Add commission router
     from api.routers.commission_router import create_commission_router
+
     app.include_router(create_commission_router())
 
     # Start HTTP server
     import uvicorn
+
     port = int(os.getenv("COMMISSION_SERVICE_PORT", 8004))
 
     async def run_http_server():
@@ -184,8 +192,10 @@ async def start_hybrid_mode():
     async def run_event_consumer():
         # Small delay to ensure HTTP server starts first
         await asyncio.sleep(2)
-        logger.info("🎧 Commission Service is now listening for tracking events from Pulsar")
-        
+        logger.info(
+            "🎧 Commission Service is now listening for tracking events from Pulsar"
+        )
+
         # The consumer will run indefinitely, which is what we want
         # The consumer task from lifespan will handle the actual consumption
 

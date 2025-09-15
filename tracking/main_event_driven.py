@@ -94,12 +94,14 @@ async def start_http_mode():
 
     # Add tracking router
     from api.routers.tracking_router import create_tracking_router
+
     app.include_router(create_tracking_router())
 
     # Start server
     import uvicorn
+
     port = int(os.getenv("TRACKING_SERVICE_PORT", 8003))
-    
+
     logger.info(f"🚀 Tracking Service HTTP API available at http://localhost:{port}")
     logger.info(f"📖 API Documentation: http://localhost:{port}/docs")
 
@@ -129,8 +131,10 @@ async def start_event_driven_mode():
             container._services["pulsar_publisher"] = None
 
         # Start event-driven service (if there are event consumers to start)
-        logger.info("📡 Event-driven mode ready - service can receive HTTP requests and publish to Pulsar")
-        
+        logger.info(
+            "📡 Event-driven mode ready - service can receive HTTP requests and publish to Pulsar"
+        )
+
         # Keep the service running
         while True:
             await asyncio.sleep(10)
@@ -151,7 +155,7 @@ async def start_hybrid_mode():
     app = FastAPI(
         title="Tracking Service",
         description="Event-driven Tracking microservice for affiliate marketing platform",
-        version="1.0.0", 
+        version="1.0.0",
         lifespan=lifespan,
     )
 
@@ -173,10 +177,12 @@ async def start_hybrid_mode():
 
     # Add tracking router
     from api.routers.tracking_router import create_tracking_router
+
     app.include_router(create_tracking_router())
 
     # Start HTTP server
     import uvicorn
+
     port = int(os.getenv("TRACKING_SERVICE_PORT", 8003))
 
     async def run_http_server():
@@ -188,7 +194,7 @@ async def start_hybrid_mode():
         # Small delay to ensure HTTP server starts first
         await asyncio.sleep(2)
         logger.info("📡 Event consumer ready - service can publish events to Pulsar")
-        
+
         # Keep event consumer running
         while True:
             await asyncio.sleep(10)
