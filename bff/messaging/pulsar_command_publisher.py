@@ -2,8 +2,18 @@ import json
 import pulsar
 from uuid import uuid4
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, Any
 from config.pulsar_config import PulsarConfig
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle Decimal types"""
+
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
 
 
 class PulsarCommandPublisher:
@@ -27,7 +37,9 @@ class PulsarCommandPublisher:
             for topic in command_topics:
                 await self._create_producer_for_topic(topic)
 
-            print(f"✅ BFF Pulsar publisher started with {len(self._producers)} producers")
+            print(
+                f"✅ BFF Pulsar publisher started with {len(self._producers)} producers"
+            )
 
         except Exception as e:
             print(f"❌ Failed to start BFF Pulsar publisher: {e}")
@@ -59,7 +71,7 @@ class PulsarCommandPublisher:
         partner_id: str,
         partner_type: str,
         acceptance_terms: Dict[str, Any],
-        estimated_monthly_reach: int
+        estimated_monthly_reach: int,
     ) -> str:
         """Publish campaign accept command"""
 
@@ -75,10 +87,10 @@ class PulsarCommandPublisher:
                 "partner_id": partner_id,
                 "partner_type": partner_type,
                 "acceptance_terms": acceptance_terms,
-                "estimated_monthly_reach": estimated_monthly_reach
+                "estimated_monthly_reach": estimated_monthly_reach,
             },
             # TODO: In future, this will be Avro schema version
-            "schema_version": "v1"
+            "schema_version": "v1",
         }
 
         await self._publish_command(PulsarConfig.CAMPAIGN_ACCEPT_COMMANDS, command_data)
@@ -92,7 +104,7 @@ class PulsarCommandPublisher:
         evidence_type: str,
         evidence_details: Dict[str, Any],
         audience_data: Dict[str, Any],
-        description: str
+        description: str,
     ) -> str:
         """Publish evidence upload command"""
 
@@ -109,9 +121,9 @@ class PulsarCommandPublisher:
                 "evidence_type": evidence_type,
                 "evidence_details": evidence_details,
                 "audience_data": audience_data,
-                "description": description
+                "description": description,
             },
-            "schema_version": "v1"
+            "schema_version": "v1",
         }
 
         await self._publish_command(PulsarConfig.EVIDENCE_UPLOAD_COMMANDS, command_data)
@@ -124,7 +136,7 @@ class PulsarCommandPublisher:
         request_type: str,
         payment_details: Dict[str, Any],
         commission_period: Dict[str, Any],
-        invoice_details: Dict[str, Any]
+        invoice_details: Dict[str, Any],
     ) -> str:
         """Publish payment request command"""
 
@@ -140,9 +152,9 @@ class PulsarCommandPublisher:
                 "request_type": request_type,
                 "payment_details": payment_details,
                 "commission_period": commission_period,
-                "invoice_details": invoice_details
+                "invoice_details": invoice_details,
             },
-            "schema_version": "v1"
+            "schema_version": "v1",
         }
 
         await self._publish_command(PulsarConfig.PAYMENT_REQUEST_COMMANDS, command_data)
@@ -156,19 +168,21 @@ class PulsarCommandPublisher:
                 raise Exception(f"No producer available for topic: {topic}")
 
             # Serialize command data (JSON for now, Avro in future)
-            message_data = json.dumps(command_data).encode("utf-8")
+            message_data = json.dumps(command_data, cls=DecimalEncoder).encode("utf-8")
 
             # Add message properties for routing and tracing
             properties = {
                 "command_id": command_data["command_id"],
                 "command_type": command_data["command_type"],
                 "user_id": command_data["user_id"],
-                "schema_version": command_data["schema_version"]
+                "schema_version": command_data["schema_version"],
             }
 
             producer.send(message_data, properties=properties)
 
-            print(f"📤 Published {command_data['command_type']} command: {command_data['command_id']}")
+            print(
+                f"📤 Published {command_data['command_type']} command: {command_data['command_id']}"
+            )
 
         except Exception as e:
             print(f"❌ Failed to publish command to {topic}: {e}")

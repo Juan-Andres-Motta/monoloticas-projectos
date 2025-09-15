@@ -29,7 +29,9 @@ class PulsarResponseConsumer:
                 await self._create_consumer_for_topic(topic)
 
             self._running = True
-            print(f"✅ BFF Pulsar response consumer started with {len(self._consumers)} consumers")
+            print(
+                f"✅ BFF Pulsar response consumer started with {len(self._consumers)} consumers"
+            )
 
             # Start consuming in background tasks
             tasks = []
@@ -63,7 +65,9 @@ class PulsarResponseConsumer:
                 print(f"❌ Failed to create consumer for {topic}: {topic_error}")
                 continue
 
-        print(f"⚠️  Could not create consumer for {base_topic} - will continue without it")
+        print(
+            f"⚠️  Could not create consumer for {base_topic} - will continue without it"
+        )
 
     async def _consume_loop(self, topic: str, consumer):
         """Main consumption loop for a specific topic"""
@@ -96,7 +100,9 @@ class PulsarResponseConsumer:
             # Parse message data
             data = json.loads(msg.data().decode("utf-8"))
 
-            print(f"📥 Received response from {topic}: {data.get('command_id', 'unknown')}")
+            print(
+                f"📥 Received response from {topic}: {data.get('command_id', 'unknown')}"
+            )
 
             # Extract command ID and find registered handler
             command_id = data.get("command_id")
@@ -118,7 +124,9 @@ class PulsarResponseConsumer:
         self._response_handlers[command_id] = handler
         print(f"📝 Registered response handler for command: {command_id}")
 
-    async def wait_for_response(self, command_id: str, timeout_seconds: int = 30) -> Dict[str, Any]:
+    async def wait_for_response(
+        self, command_id: str, timeout_seconds: int = 30
+    ) -> Dict[str, Any]:
         """Wait for a response to a specific command (for synchronous-like behavior)"""
         response_data = None
         response_received = asyncio.Event()

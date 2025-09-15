@@ -20,7 +20,7 @@ class PulsarConfig:
     CAMPAIGN_ACCEPT_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/campaign-commands"
     CAMPAIGN_ACCEPT_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/campaign-events"
 
-    EVIDENCE_UPLOAD_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/tracking-commands"  
+    EVIDENCE_UPLOAD_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/tracking-commands"
     EVIDENCE_UPLOAD_RESPONSES = f"persistent://{TENANT}/{NAMESPACE}/tracking-events"
 
     PAYMENT_REQUEST_COMMANDS = f"persistent://{TENANT}/{NAMESPACE}/payment-commands"
