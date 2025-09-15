@@ -154,8 +154,7 @@ services:
       commission-db:
         condition: service_healthy
     restart: unless-stopped
-    # TODO: Implement commission event handlers
-    command: echo "Commission service event handlers not yet implemented"
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000
     volumes:
       - ./comission:/app
     working_dir: /app
@@ -180,8 +179,7 @@ services:
       payment-db:
         condition: service_healthy
     restart: unless-stopped
-    # TODO: Implement payment event handlers
-    command: echo "Payment service event handlers not yet implemented"
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000
     volumes:
       - ./payment:/app
     working_dir: /app
