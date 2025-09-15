@@ -1,30 +1,69 @@
-# Microservices Project - Event-Driven Architecture
+# Alpes Partners - Event-Driven Microservices Platform
 
-This project demonstrates **two architectural patterns** for microservice communication:
+A complete event-driven microservices architecture using **Apache Pulsar** for inter-service communication and **BFF (Backend for Frontend)** pattern for client interactions.
 
-## 🏗️ Architecture Patterns
+## 🏗️ Architecture Overview
 
-### 1. Traditional HTTP-based (Original)
-- **Tracking Service**: HTTP API for recording tracking events
-- **Commission Service**: HTTP API for commission calculations  
-- **Campaign Service**: HTTP API for campaign management
-- **Payment Service**: HTTP API for payment processing
+```
+┌─────────────┐    Events    ┌───────────────────────────────────┐
+│             │──────────────▶│         Apache Pulsar             │
+│     BFF     │              │     (DataStax Astra Streaming)    │
+│  (FastAPI)  │              │  - Campaign Commands/Events       │
+│             │◀─────────────│  - Evidence Commands/Events       │
+└─────────────┘   Responses  │  - Payment Commands/Events        │
+                              └───────────────────────────────────┘
+                                             │
+                                             │ Event Distribution
+                                             ▼
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│  Campaign   │  │  Tracking   │  │ Commission  │  │  Payment    │
+│  Service    │  │  Service    │  │  Service    │  │  Service    │
+│             │  │             │  │             │  │             │
+│ PostgreSQL  │  │ PostgreSQL  │  │ PostgreSQL  │  │ PostgreSQL  │
+└─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘
+```
 
-### 2. Event-Driven with Avro Schemas (New)
-- **Services communicate via Pulsar topics** instead of HTTP calls
-- **Avro schemas** provide type safety and schema evolution
-- **Command events** trigger operations in specific services
-- **Domain events** notify when operations complete
-- **Correlation IDs** for tracking workflows across services
+## 🚀 Quick Start
+
+### Prerequisites
+- Docker & Docker Compose
+- DataStax Astra Streaming account (or Apache Pulsar cluster)
+
+### 1. Environment Setup
+```bash
+# Copy and configure environment variables
+cp .env.example .env
+
+# Update .env with your DataStax Astra Streaming credentials:
+# PULSAR_SERVICE_URL=pulsar+ssl://your-cluster.streaming.datastax.com:6651
+# PULSAR_TOKEN=your_token_here
+```
+
+### 2. Start the Platform
+```bash
+# Start all services in event-driven mode
+./start_platform.sh
+```
+
+### 3. Access the Services
+- **BFF API**: http://localhost:8001
+- **BFF Documentation**: http://localhost:8001/docs  
+- **Campaign Service**: http://localhost:8002 (if hybrid mode)
+- **Database Admin**: http://localhost:9001
+
+### 4. Stop the Platform
+```bash
+./stop_platform.sh
+```
 
 ## 🎯 Event-Driven Benefits
 
-✅ **Loose Coupling**: Services don't need to know about each other  
-✅ **Better Scalability**: Asynchronous processing improves performance  
-✅ **Fault Tolerance**: Services work independently  
-✅ **Type Safety**: Avro schemas prevent integration errors  
-✅ **Schema Evolution**: Backward/forward compatibility  
-✅ **Event Tracing**: Complete audit trail with correlation IDs
+✅ **Asynchronous Processing**: Non-blocking operations for better performance  
+✅ **Loose Coupling**: Services communicate via events, not direct calls  
+✅ **Scalability**: Each service can scale independently  
+✅ **Fault Tolerance**: System continues working if individual services fail  
+✅ **Event Sourcing**: Complete audit trail of all operations  
+✅ **Schema Evolution**: Backward/forward compatible message formats
 
 ## Event-Driven Architecture
 

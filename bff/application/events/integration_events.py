@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from enum import Enum
 
 
-class TimestampMixin(BaseModel):
+class TimestampMixin:
     """Mixin for timestamps"""
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None

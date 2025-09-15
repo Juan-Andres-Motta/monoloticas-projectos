@@ -1,20 +1,27 @@
 from pydantic import BaseModel
 from uuid import UUID
 from enum import Enum
+from typing import Optional
 
 
 class CommandStatus(str, Enum):
-    SUBMITTED = "SUBMITTED"
-    PROCESSING = "PROCESSING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
+    SUBMITTED = "submitted"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ProcessingStatus(str, Enum):
+    SYNC = "sync"
+    ASYNC = "async"
 
 
 class UploadEvidenceResponse(BaseModel):
-    command_id: UUID
+    command_id: str
     status: CommandStatus
     message: str
     campaign_id: str
     partner_id: str
-    user_id: str
     evidence_type: str
+    processing_status: ProcessingStatus = ProcessingStatus.ASYNC
+    user_id: Optional[str] = None

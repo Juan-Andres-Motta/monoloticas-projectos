@@ -5,7 +5,7 @@ from uuid import UUID
 from enum import Enum
 
 
-class TimestampMixin(BaseModel):
+class TimestampMixin:
     """Mixin for DTOs that need timestamp fields"""
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = None
@@ -106,7 +106,7 @@ class AddressDto(BaseModel):
 
 class ContactDto(BaseModel):
     """Standard contact information DTO"""
-    email: str = Field(..., regex=r'^[^@]+@[^@]+\.[^@]+$')
+    email: str = Field(..., pattern=r'^[^@]+@[^@]+\.[^@]+$')
     phone: Optional[str] = None
     website: Optional[str] = None
 

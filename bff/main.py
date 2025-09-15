@@ -14,21 +14,31 @@ async def lifespan(app: FastAPI):
     # Startup logic
     print("🚀 Starting BFF Service...")
 
-    # Initialize Pulsar publisher
+    # Initialize Pulsar publisher with timeout
     try:
-        await pulsar_command_publisher.start()
+        import asyncio
+        await asyncio.wait_for(pulsar_command_publisher.start(), timeout=10.0)
         app.state.pulsar_publisher = pulsar_command_publisher
         print("✅ Pulsar command publisher started")
+    except asyncio.TimeoutError:
+        print("⚠️  Pulsar publisher initialization timed out")
+        print("🔄 Service will continue without command publishing")
+        app.state.pulsar_publisher = None
     except Exception as e:
         print(f"⚠️  Pulsar publisher failed to start: {e}")
         print("🔄 Service will continue without command publishing")
         app.state.pulsar_publisher = None
 
-    # Initialize Pulsar response consumer
+    # Initialize Pulsar response consumer with timeout
     try:
-        consumer_tasks = await pulsar_response_consumer.start()
+        import asyncio
+        consumer_tasks = await asyncio.wait_for(pulsar_response_consumer.start(), timeout=10.0)
         app.state.pulsar_consumer_tasks = consumer_tasks
         print("✅ Pulsar response consumer started")
+    except asyncio.TimeoutError:
+        print("⚠️  Pulsar consumer initialization timed out")
+        print("🔄 Service will continue without response consuming")
+        app.state.pulsar_consumer_tasks = []
     except Exception as e:
         print(f"⚠️  Pulsar consumer failed to start: {e}")
         print("🔄 Service will continue without response consuming")
