@@ -1,9 +1,0 @@
-from abc import ABC
-from dataclasses import dataclass
-
-
-@dataclass
-class Command(ABC):
-    """Base command for CQRS"""
-
-    pass
