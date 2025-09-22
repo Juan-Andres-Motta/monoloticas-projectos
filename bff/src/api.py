@@ -6,6 +6,7 @@ import uuid
 from src.application.commands.publish_partner_command import PublishPartnerCommand
 from src.application.handlers.publish_partner_handler import PublishPartnerHandler
 from src.domain.entities.partner import Partner, AcceptanceTerms
+from src.domain.entities.payment import Payment
 from src.infrastructure.adapters.pulsar_producer import PulsarEventPublisher
 
 app = FastAPI(title="BFF Service", version="1.0.0")
@@ -52,6 +53,14 @@ class TrackingEventRequest(BaseModel):
 
 class FailTrackingEventRequest(BaseModel):
     tracking_id: int
+
+
+class PaymentRequest(BaseModel):
+    amount: float
+    currency: str
+    payment_method: str
+    account_details: str
+    user_id: str
 
 
 @app.post("/partners")
@@ -153,3 +162,19 @@ async def fail_tracking_event(fail_request: FailTrackingEventRequest):
         raise HTTPException(
             status_code=500, detail="Failed to publish fail tracking event"
         )
+
+
+@app.post("/payments")
+async def create_payment(payment_request: PaymentRequest):
+    try:
+        payment = Payment(**payment_request.dict())
+        await publisher.publish_payment_event(payment)
+        return {
+            "message": "Payment event published successfully",
+            "user_id": payment.user_id,
+            "amount": payment.amount,
+            "currency": payment.currency,
+        }
+    except Exception as e:
+        logger.error(f"Error publishing payment event: {e}")
+        raise HTTPException(status_code=500, detail="Failed to publish payment event")
