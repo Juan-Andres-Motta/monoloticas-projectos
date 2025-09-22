@@ -1,0 +1,119 @@
+/* Alpes Partners TO-BE MVP Context Map - SIMPLIFIED VERSION
+ * DDD Expert Analysis for Core Operations
+ * Version: Without Detailed Aggregates
+ */
+
+ContextMap AlpesPartnersToBeMap {
+  type = SYSTEM_LANDSCAPE
+  state = TO_BE
+
+  contains CampaignManagement
+  contains PartnerManagement
+  contains EventTracking
+  contains CommissionCalculation
+  contains PaymentProcessing
+  contains ComplianceMonitoring
+
+  /* Core Business Flow - Customer/Supplier Relationships */
+  PartnerManagement [U,S,PL]->[D,C] CampaignManagement
+  CampaignManagement [U,S,PL]->[D,C] EventTracking
+  EventTracking [U,S,PL]->[D,C] CommissionCalculation
+  CommissionCalculation [U,S,PL]->[D,C] PaymentProcessing
+
+  /* Compliance Cross-cutting - Open Host Service */
+  ComplianceMonitoring [U,OHS,PL]->[D] PartnerManagement
+  ComplianceMonitoring [U,OHS,PL]->[D] EventTracking
+  ComplianceMonitoring [U,OHS,PL]->[D] PaymentProcessing
+
+  /* Analytics Feedback - Customer/Supplier */
+  EventTracking [U,S,PL]->[D,C] CampaignManagement
+  CommissionCalculation [U,S,PL]->[D,C] PartnerManagement
+}
+
+/* ===================== DOMAIN DEFINITIONS ===================== */
+
+Domain PartnershipManagement {
+  domainVisionStatement = "Core partnership ecosystem management and operations"
+
+  Subdomain PartnerLifecycle {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Partner onboarding, verification, and relationship management"
+  }
+
+  Subdomain CampaignOrchestration {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Campaign creation, management, and partner coordination"
+  }
+}
+
+Domain PerformanceTracking {
+  domainVisionStatement = "Event attribution and performance measurement"
+
+  Subdomain EventCapture {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "User interaction tracking and event attribution"
+  }
+
+  Subdomain CommissionEngine {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Commission calculation and partner compensation"
+  }
+}
+
+Domain FinancialOperations {
+  domainVisionStatement = "Financial transaction processing and compliance"
+
+  Subdomain PaymentExecution {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "Payment processing and financial transaction management"
+  }
+
+  Subdomain RegulatoryCompliance {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "Fraud detection, compliance monitoring, and risk management"
+  }
+}
+
+/* ===================== BOUNDED CONTEXTS ===================== */
+
+BoundedContext CampaignManagement implements CampaignOrchestration {
+  type = FEATURE
+  domainVisionStatement = "Manages campaign lifecycle, partner associations, and content coordination"
+  implementationTechnology = "Python, FastAPI, PostgreSQL, Pulsar"
+  responsibilities = "Campaign creation, Partner association, Content management, Campaign activation"
+}
+
+BoundedContext EventTracking implements EventCapture {
+  type = FEATURE
+  domainVisionStatement = "Captures and processes user interaction events for attribution"
+  implementationTechnology = "Python, FastAPI, PostgreSQL, Pulsar"
+  responsibilities = "Event tracking, Attribution processing, Commission event generation"
+}
+
+BoundedContext CommissionCalculation implements CommissionEngine {
+  type = FEATURE
+  domainVisionStatement = "Calculates partner commissions based on tracking events"
+  implementationTechnology = "Python, FastAPI, PostgreSQL, Pulsar"
+  responsibilities = "Commission calculation, Rate application, Payment preparation"
+}
+
+BoundedContext PaymentProcessing implements PaymentExecution {
+  type = FEATURE
+  domainVisionStatement = "Processes commission payments to partners"
+  implementationTechnology = "Python, FastAPI, PostgreSQL, Pulsar"
+  responsibilities = "Payment execution, Transaction management, Payment status tracking"
+}
+
+BoundedContext PartnerManagement implements PartnerLifecycle {
+  type = FEATURE
+  domainVisionStatement = "Manages partner onboarding, verification, and lifecycle"
+  implementationTechnology = "Python, FastAPI, PostgreSQL, Pulsar"
+  responsibilities = "Partner registration, Verification processes, Partner lifecycle management"
+}
+
+BoundedContext ComplianceMonitoring implements RegulatoryCompliance {
+  type = FEATURE
+  domainVisionStatement = "Ensures regulatory compliance and fraud detection"
+  implementationTechnology = "Python, FastAPI, PostgreSQL, Pulsar"
+  responsibilities = "Fraud detection, Compliance monitoring, Risk assessment, Regulatory reporting"
+}
