@@ -41,6 +41,10 @@ async def startup_event():
         "PULSAR_FAIL_TOPIC",
         "persistent://miso-1-2025/default/fail-tracking-events",
     )
+    payment_topic = os.getenv(
+        "PULSAR_PAYMENT_TOPIC",
+        "persistent://miso-1-2025/default/payments-request",
+    )
 
     publisher = PulsarEventPublisher(
         pulsar_service_url,
@@ -50,6 +54,7 @@ async def startup_event():
         content_topic,
         tracking_topic,
         fail_topic,
+        payment_topic,
         pulsar_token,
     )
     await publisher.connect()
