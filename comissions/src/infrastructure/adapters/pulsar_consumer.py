@@ -11,6 +11,8 @@ from src.application.commands.register_commission_command import (
     RegisterCommissionCommand,
 )
 from src.domain.entities.commission import Commission
+from src.domain.entities.saga_log import SagaLog, SagaStep, SagaStatus
+from src.domain.ports.saga_log_repository import SagaLogRepository
 from .schemas import CommissionRecord
 from .models import campaign_partners_table
 from .pulsar_fail_tracking_publisher import PulsarFailTrackingPublisher
@@ -23,6 +25,7 @@ class PulsarConsumer:
         self,
         handler: RegisterCommissionHandler,
         fail_tracking_publisher: PulsarFailTrackingPublisher,
+        saga_log_repository: SagaLogRepository,
         campaigns_db_url: str,
         pulsar_service_url: str = "pulsar://localhost:6650",
         topic: str = "persistent://miso-1-2025/default/assign-commission-to-partner",
@@ -30,6 +33,7 @@ class PulsarConsumer:
     ):
         self.handler = handler
         self.fail_tracking_publisher = fail_tracking_publisher
+        self.saga_log_repository = saga_log_repository
         self.campaigns_db_url = campaigns_db_url
         self.pulsar_service_url = pulsar_service_url
         self.topic = topic
@@ -78,6 +82,23 @@ class PulsarConsumer:
                 partner_id = result.scalar_one_or_none()
                 if not partner_id:
                     logger.error(f"No partner found for campaign {campaign_id}")
+                    saga_id = str(record.tracking_id)
+                    await self.saga_log_repository.save(
+                        SagaLog(
+                            saga_id=saga_id,
+                            step=SagaStep.PARTNER_QUERIED,
+                            status=SagaStatus.FAILED,
+                            details=f"No partner for campaign {campaign_id}",
+                        )
+                    )
+                    await self.saga_log_repository.save(
+                        SagaLog(
+                            saga_id=saga_id,
+                            step=SagaStep.COMMISSION_FAILED,
+                            status=SagaStatus.FAILED,
+                            details="No partner found",
+                        )
+                    )
                     try:
                         await self.fail_tracking_publisher.publish_fail_tracking_event(
                             record.tracking_id
@@ -111,6 +132,15 @@ class PulsarConsumer:
             except Exception as e:
                 logger.error(f"Error processing message: {e}")
                 if msg:
+                    saga_id = str(record.tracking_id)
+                    await self.saga_log_repository.save(
+                        SagaLog(
+                            saga_id=saga_id,
+                            step=SagaStep.COMMISSION_FAILED,
+                            status=SagaStatus.FAILED,
+                            details=str(e),
+                        )
+                    )
                     try:
                         await self.fail_tracking_publisher.publish_fail_tracking_event(
                             record.tracking_id
