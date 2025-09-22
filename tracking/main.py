@@ -6,6 +6,12 @@ from dotenv import load_dotenv
 from src.infrastructure.adapters.postgres_tracking_event_repository import (
     PostgresTrackingEventRepository,
 )
+from src.infrastructure.adapters.postgres_saga_log_repository import (
+    PostgresSagaLogRepository,
+)
+from src.infrastructure.adapters.postgres_processed_message_repository import (
+    PostgresProcessedMessageRepository,
+)
 from src.application.handlers.register_tracking_event_handler import (
     RegisterTrackingEventHandler,
 )
@@ -43,6 +49,8 @@ async def main():
     # Dependency injection
     sessionmaker_instance = async_sessionmaker(engine, expire_on_commit=False)
     repo = PostgresTrackingEventRepository(sessionmaker_instance)
+    saga_log_repo = PostgresSagaLogRepository(sessionmaker_instance)
+    processed_message_repo = PostgresProcessedMessageRepository(sessionmaker_instance)
     pulsar_service_url = os.getenv("PULSAR_SERVICE_URL", "pulsar://localhost:6650")
     pulsar_token = os.getenv("PULSAR_TOKEN", "")
     pulsar_topic = os.getenv(
@@ -57,20 +65,24 @@ async def main():
     )
     await commission_publisher.connect()
 
-    handler = RegisterTrackingEventHandler(repo, commission_publisher)
+    handler = RegisterTrackingEventHandler(repo, commission_publisher, saga_log_repo)
     consumer = PulsarConsumer(handler, pulsar_service_url, pulsar_topic, pulsar_token)
     logger.info(
         f"Starting Pulsar consumer on {pulsar_service_url}, topic: {pulsar_topic}"
     )
 
     print("Creating fail handler and consumer")
-    fail_handler = FailTrackingEventHandler(repo)
+    fail_handler = FailTrackingEventHandler(repo, saga_log_repo)
     fail_topic = os.getenv(
         "PULSAR_FAIL_TOPIC",
         "persistent://miso-1-2025/default/fail-tracking-events-partition-0",
     )
     fail_consumer = FailTrackingEventConsumer(
-        fail_handler, pulsar_service_url, fail_topic, pulsar_token
+        fail_handler,
+        processed_message_repo,
+        pulsar_service_url,
+        fail_topic,
+        pulsar_token,
     )
     print(f"Fail consumer created: {fail_consumer}")
     print("Fail consumer created")
