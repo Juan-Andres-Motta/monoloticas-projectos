@@ -9,6 +9,7 @@ from src.application.handlers.fail_tracking_event_handler import (
 from src.application.commands.fail_tracking_event_command import (
     FailTrackingEventCommand,
 )
+from src.domain.ports.processed_message_repository import ProcessedMessageRepository
 from .schemas import FailTrackingEventRecord
 
 logger = logging.getLogger(__name__)
@@ -18,11 +19,13 @@ class FailTrackingEventConsumer:
     def __init__(
         self,
         handler: FailTrackingEventHandler,
+        processed_message_repository: ProcessedMessageRepository,
         pulsar_service_url: str = "pulsar://localhost:6650",
         topic: str = "persistent://miso-1-2025/default/fail-tracking-events",
         token: str = "",
     ):
         self.handler = handler
+        self.processed_message_repository = processed_message_repository
         self.pulsar_service_url = pulsar_service_url
         self.topic = topic
         self.token = token
@@ -61,12 +64,18 @@ class FailTrackingEventConsumer:
             try:
                 msg = await asyncio.to_thread(self.consumer.receive)
                 logger.info("Received fail tracking event message from Pulsar")
+                message_id = str(msg.message_id())
+                if await self.processed_message_repository.is_processed(message_id):
+                    logger.info(f"Message {message_id} already processed, skipping")
+                    self.consumer.acknowledge(msg)
+                    continue
                 record = msg.value()
                 tracking_id_str = record.tracking_id
                 logger.info(f"Record received: tracking_id={tracking_id_str}")
                 command = FailTrackingEventCommand(tracking_id=int(tracking_id_str))
                 logger.info(f"Created command for tracking_id: {command.tracking_id}")
                 await self.handler.handle(command)
+                await self.processed_message_repository.mark_processed(message_id)
                 self.consumer.acknowledge(msg)
                 logger.info(
                     f"Fail tracking event processed successfully for tracking_id: {tracking_id_str}"
