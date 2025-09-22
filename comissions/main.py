@@ -1,10 +1,13 @@
 import asyncio
 import os
 import logging
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from dotenv import load_dotenv
 from src.infrastructure.adapters.postgres_commission_repository import (
     PostgresCommissionRepository,
+)
+from src.infrastructure.adapters.postgres_saga_log_repository import (
+    PostgresSagaLogRepository,
 )
 from src.application.handlers.register_commission_handler import (
     RegisterCommissionHandler,
@@ -37,9 +40,10 @@ async def main():
     logger.info("Database tables created/verified")
 
     # Dependency injection
-    session = AsyncSession(engine)
-    repo = PostgresCommissionRepository(session)
-    handler = RegisterCommissionHandler(repo)
+    sessionmaker_instance = async_sessionmaker(engine, expire_on_commit=False)
+    repo = PostgresCommissionRepository(sessionmaker_instance)
+    saga_log_repo = PostgresSagaLogRepository(sessionmaker_instance)
+    handler = RegisterCommissionHandler(repo, saga_log_repo)
     pulsar_service_url = os.getenv("PULSAR_SERVICE_URL", "pulsar://localhost:6650")
     pulsar_token = os.getenv("PULSAR_TOKEN", "")
     pulsar_topic = os.getenv(
@@ -57,6 +61,7 @@ async def main():
     consumer = PulsarConsumer(
         handler,
         fail_tracking_publisher,
+        saga_log_repo,
         campaigns_db_url,
         pulsar_service_url,
         pulsar_topic,
@@ -83,8 +88,7 @@ async def main():
     except asyncio.CancelledError:
         pass
     finally:
-        logger.info("Closing database session")
-        await session.close()
+        logger.info("Disposing database engine")
         await engine.dispose()
         logger.info("Service shutdown complete")
 
