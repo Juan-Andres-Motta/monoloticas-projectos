@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  db_campaigns:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: campaigns
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5436:5432"
+    volumes:
+      - campaigns_data:/var/lib/postgresql/data
+
+  db_commissions:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: commissionsdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - commissions_data:/var/lib/postgresql/data
+
+  db_payments:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: paymentsdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5434:5432"
+    volumes:
+      - payments_data:/var/lib/postgresql/data
+
+  db_tracking:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: trackingdb
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5435:5432"
+    volumes:
+      - tracking_data:/var/lib/postgresql/data
+
+  bff:
+    build: ./bff
+    ports:
+      - "8083:8000"
+    environment:
+      PULSAR_SERVICE_URL: pulsar+ssl://pulsar-aws-useast2.streaming.datastax.com:6651
+      PULSAR_TOKEN: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjEwNjc3ODksImlhdCI6MTc1ODQ3NTc4OSwiaXNzIjoiZGF0YXN0YXgiLCJzdWIiOiJjbGllbnQ7YWIzNWNmOGQtMGUwMi00OWU2LWJiYWEtNjEwNGM0ZjU2N2MxO2JXbHpieTB4TFRJd01qVT07YzhhNWM0OGUwOCIsInRva2VuaWQiOiJjOGE1YzQ4ZTA4In0.UPlfudl92SIFcQlUKharb8hBBJfmNIM_z1-pvSOeDUWI0PYotZB4TtU60qyZypj6ObfPgNyb8bSM7jeMtS-tXCWCzIqoaxq_ydLxW21GmBGmyaLSGxGxv3uftbwbB7W07PwrK0eUhqdtZIxUKqG5f0E2oRjUfCQ-6Aillek2wBlzOWvUgvZtLQ3R2meRv_jSHPSlWktfTZd9PLtQ2nJKt6wURJ9-EM6LGZJLg66kGRLYG_bxEG66KVxdYxJlTmnQxnTJUfLq8D9gmHQPMK73i5SH6gqpe9OgkMxNk5x3QMpVQkGcl2SvJl-KKGpHRn9hXm2Ew8FY-rQBfQHXfqJn0w
+      PULSAR_PARTNER_TOPIC: persistent://miso-1-2025/default/campaigns-partner-registration
+      PULSAR_CAMPAIGN_TOPIC: persistent://miso-1-2025/default/campaign-creation
+      PULSAR_ASSOCIATION_TOPIC: persistent://miso-1-2025/default/campaign-partner-association
+      PULSAR_CONTENT_TOPIC: persistent://miso-1-2025/default/campaign-content-association
+      PULSAR_TRACKING_TOPIC: persistent://miso-1-2025/default/campaign-tracking-events
+      PULSAR_FAIL_TOPIC: persistent://miso-1-2025/default/fail-tracking-events
+      PULSAR_PAYMENT_TOPIC: persistent://miso-1-2025/default/payments-request
+
+  campaigns:
+    build: ./campaigns
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db_campaigns/campaigns
+      PULSAR_SERVICE_URL: pulsar+ssl://pulsar-aws-useast2.streaming.datastax.com:6651
+      PULSAR_TOKEN: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjEwNjc3ODksImlhdCI6MTc1ODQ3NTc4OSwiaXNzIjoiZGF0YXN0YXgiLCJzdWIiOiJjbGllbnQ7YWIzNWNmOGQtMGUwMi00OWU2LWJiYWEtNjEwNGM0ZjU2N2MxO2JXbHpieTB4TFRJd01qVT07YzhhNWM0OGUwOCIsInRva2VuaWQiOiJjOGE1YzQ4ZTA4In0.UPlfudl92SIFcQlUKharb8hBBJfmNIM_z1-pvSOeDUWI0PYotZB4TtU60qyZypj6ObfPgNyb8bSM7jeMtS-tXCWCzIqoaxq_ydLxW21GmBGmyaLSGxGxv3uftbwbB7W07PwrK0eUhqdtZIxUKqG5f0E2oRjUfCQ-6Aillek2wBlzOWvUgvZtLQ3R2meRv_jSHPSlWktfTZd9PLtQ2nJKt6wURJ9-EM6LGZJLg66kGRLYG_bxEG66KVxdYxJlTmnQxnTJUfLq8D9gmHQPMK73i5SH6gqpe9OgkMxNk5x3QMpVQkGcl2SvJl-KKGpHRn9hXm2Ew8FY-rQBfQHXfqJn0w
+      PULSAR_PARTNER_TOPIC: persistent://miso-1-2025/default/campaigns-partner-registration
+      PULSAR_CAMPAIGN_TOPIC: persistent://miso-1-2025/default/campaign-creation
+      PULSAR_ASSOCIATION_TOPIC: persistent://miso-1-2025/default/campaign-partner-association
+      PULSAR_CONTENT_TOPIC: persistent://miso-1-2025/default/campaign-content-association
+    depends_on:
+      - db_campaigns
+
+  commissions:
+    build: ./comissions
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db_commissions/commissionsdb
+      PULSAR_SERVICE_URL: pulsar+ssl://pulsar-aws-useast2.streaming.datastax.com:6651
+      PULSAR_TOKEN: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjEwNjc3ODksImlhdCI6MTc1ODQ3NTc4OSwiaXNzIjoiZGF0YXN0YXgiLCJzdWIiOiJjbGllbnQ7YWIzNWNmOGQtMGUwMi00OWU2LWJiYWEtNjEwNGM0ZjU2N2MxO2JXbHpieTB4TFRJd01qVT07YzhhNWM0OGUwOCIsInRva2VuaWQiOiJjOGE1YzQ4ZTA4In0.UPlfudl92SIFcQlUKharb8hBBJfmNIM_z1-pvSOeDUWI0PYotZB4TtU60qyZypj6ObfPgNyb8bSM7jeMtS-tXCWCzIqoaxq_ydLxW21GmBGmyaLSGxGxv3uftbwbB7W07PwrK0eUhqdtZIxUKqG5f0E2oRjUfCQ-6Aillek2wBlzOWvUgvZtLQ3R2meRv_jSHPSlWktfTZd9PLtQ2nJKt6wURJ9-EM6LGZJLg66kGRLYG_bxEG66KVxdYxJlTmnQxnTJUfLq8D9gmHQPMK73i5SH6gqpe9OgkMxNk5x3QMpVQkGcl2SvJl-KKGpHRn9hXm2Ew8FY-rQBfQHXfqJn0w
+      PULSAR_TOPIC: persistent://miso-1-2025/default/assign-commission-to-partner
+      CAMPAIGNS_DATABASE_URL: postgresql+asyncpg://user:password@db_campaigns/campaigns
+      FAIL_TRACKING_TOPIC: persistent://miso-1-2025/default/fail-tracking-events
+    depends_on:
+      - db_commissions
+      - db_campaigns
+
+  payments:
+    build: ./payments
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db_payments/paymentsdb
+      PULSAR_SERVICE_URL: pulsar+ssl://pulsar-aws-useast2.streaming.datastax.com:6651
+      PULSAR_TOKEN: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjEwNjc3ODksImlhdCI6MTc1ODQ3NTc4OSwiaXNzIjoiZGF0YXN0YXgiLCJzdWIiOiJjbGllbnQ7YWIzNWNmOGQtMGUwMi00OWU2LWJiYWEtNjEwNGM0ZjU2N2MxO2JXbHpieTB4TFRJd01qVT07YzhhNWM0OGUwOCIsInRva2VuaWQiOiJjOGE1YzQ4ZTA4In0.UPlfudl92SIFcQlUKharb8hBBJfmNIM_z1-pvSOeDUWI0PYotZB4TtU60qyZypj6ObfPgNyb8bSM7jeMtS-tXCWCzIqoaxq_ydLxW21GmBGmyaLSGxGxv3uftbwbB7W07PwrK0eUhqdtZIxUKqG5f0E2oRjUfCQ-6Aillek2wBlzOWvUgvZtLQ3R2meRv_jSHPSlWktfTZd9PLtQ2nJKt6wURJ9-EM6LGZJLg66kGRLYG_bxEG66KVxdYxJlTmnQxnTJUfLq8D9gmHQPMK73i5SH6gqpe9OgkMxNk5x3QMpVQkGcl2SvJl-KKGpHRn9hXm2Ew8FY-rQBfQHXfqJn0w
+      PULSAR_TOPIC: persistent://miso-1-2025/default/payments-request
+    depends_on:
+      - db_payments
+
+  tracking:
+    build: ./tracking
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db_tracking/trackingdb
+      PULSAR_SERVICE_URL: pulsar+ssl://pulsar-aws-useast2.streaming.datastax.com:6651
+      PULSAR_TOKEN: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjEwNjc3ODksImlhdCI6MTc1ODQ3NTc4OSwiaXNzIjoiZGF0YXN0YXgiLCJzdWIiOiJjbGllbnQ7YWIzNWNmOGQtMGUwMi00OWU2LWJiYWEtNjEwNGM0ZjU2N2MxO2JXbHpieTB4TFRJd01qVT07YzhhNWM0OGUwOCIsInRva2VuaWQiOiJjOGE1YzQ4ZTA4In0.UPlfudl92SIFcQlUKharb8hBBJfmNIM_z1-pvSOeDUWI0PYotZB4TtU60qyZypj6ObfPgNyb8bSM7jeMtS-tXCWCzIqoaxq_ydLxW21GmBGmyaLSGxGxv3uftbwbB7W07PwrK0eUhqdtZIxUKqG5f0E2oRjUfCQ-6Aillek2wBlzOWvUgvZtLQ3R2meRv_jSHPSlWktfTZd9PLtQ2nJKt6wURJ9-EM6LGZJLg66kGRLYG_bxEG66KVxdYxJlTmnQxnTJUfLq8D9gmHQPMK73i5SH6gqpe9OgkMxNk5x3QMpVQkGcl2SvJl-KKGpHRn9hXm2Ew8FY-rQBfQHXfqJn0w
+      PULSAR_TOPIC: persistent://miso-1-2025/default/campaign-tracking-events
+      PULSAR_COMMISSION_TOPIC: persistent://miso-1-2025/default/assign-commission-to-partner
+      PULSAR_FAIL_TOPIC: persistent://miso-1-2025/default/fail-tracking-events-partition-0
+    depends_on:
+      - db_tracking
+
+  adminer:
+    image: adminer
+    ports:
+      - "8082:8080"
+    depends_on:
+      - db_campaigns
+      - db_commissions
+      - db_payments
+      - db_tracking
+
+volumes:
+  campaigns_data:
+  commissions_data:
+  payments_data:
+  tracking_data:
