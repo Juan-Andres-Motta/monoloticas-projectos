@@ -1,0 +1,385 @@
+@startuml Alpes Partners - Domain Model UML
+!theme aws-orange
+title Alpes Partners TO-BE MVP - Domain Model\nEntities, Aggregates, and Value Objects
+
+package "CampaignManagement Context" as CM {
+
+  package "Campaign Aggregate" as CampaignAgg {
+    class Campaign <<Aggregate Root>> {
+      - campaignId: CampaignId
+      - name: String
+      - status: CampaignStatus
+      - createdAt: Date
+      --
+      + activate()
+      + associatePartner(partnerId: PartnerId)
+      + addContent(contentId: ContentId)
+    }
+
+    class CampaignId <<Value Object>> {
+      - value: String
+    }
+
+    enum CampaignStatus {
+      DRAFT
+      ACTIVE
+      PAUSED
+      COMPLETED
+    }
+
+    Campaign --> CampaignId
+    Campaign --> CampaignStatus
+  }
+
+  package "CampaignPartnerAssociation Aggregate" as AssocAgg {
+    class CampaignPartnerAssociation <<Aggregate Root>> {
+      - campaignId: CampaignId
+      - partnerId: PartnerId
+      - associatedAt: Date
+      - status: AssociationStatus
+      --
+      + associate()
+    }
+
+    class PartnerId <<Value Object>> {
+      - value: String
+    }
+
+    enum AssociationStatus {
+      PENDING
+      ACTIVE
+      SUSPENDED
+    }
+
+    CampaignPartnerAssociation --> CampaignId
+    CampaignPartnerAssociation --> PartnerId
+    CampaignPartnerAssociation --> AssociationStatus
+  }
+
+  package "CampaignContent Aggregate" as ContentAgg {
+    class CampaignContent <<Aggregate Root>> {
+      - contentId: ContentId
+      - campaignId: CampaignId
+      - contentUrl: String
+      - status: ContentStatus
+      - submittedAt: Date
+      --
+      + submit()
+      + approve()
+      + reject()
+    }
+
+    class ContentId <<Value Object>> {
+      - value: String
+    }
+
+    enum ContentStatus {
+      SUBMITTED
+      APPROVED
+      REJECTED
+    }
+
+    CampaignContent --> ContentId
+    CampaignContent --> CampaignId
+    CampaignContent --> ContentStatus
+  }
+}
+
+package "EventTracking Context" as ET {
+
+  package "TrackingEvent Aggregate" as TrackingAgg {
+    class TrackingEvent <<Aggregate Root>> {
+      - trackingId: TrackingId
+      - campaignId: CampaignId
+      - partnerId: PartnerId
+      - eventType: EventType
+      - status: TrackingStatus
+      - timestamp: Date
+      --
+      + process()
+      + markFailed()
+      + generateCommissionEvent()
+    }
+
+    class TrackingId <<Value Object>> {
+      - value: Long
+    }
+
+    enum EventType {
+      CLICK
+      VIEW
+      CONVERSION
+      SALE
+      SIGNUP
+    }
+
+    enum TrackingStatus {
+      SUCCESS
+      FAILED
+      PROCESSED
+      REVERTED
+    }
+
+    TrackingEvent --> TrackingId
+    TrackingEvent --> CampaignId
+    TrackingEvent --> PartnerId
+    TrackingEvent --> EventType
+    TrackingEvent --> TrackingStatus
+  }
+}
+
+package "CommissionCalculation Context" as CC {
+
+  package "Commission Aggregate" as CommissionAgg {
+    class Commission <<Aggregate Root>> {
+      - commissionId: CommissionId
+      - amount: Money
+      - partnerId: PartnerId
+      - campaignId: CampaignId
+      - sourceTrackingId: TrackingId
+      - commissionType: CommissionType
+      - status: CommissionStatus
+      - calculatedAt: Date
+      --
+      + calculate()
+      + approve()
+      + reject()
+      + process()
+    }
+
+    class CommissionId <<Value Object>> {
+      - value: String
+    }
+
+    class Money <<Value Object>> {
+      - amount: BigDecimal
+      - currency: String
+    }
+
+    enum CommissionType {
+      CPA
+      CPC
+      CPL
+      CPS
+      FIXED
+    }
+
+    enum CommissionStatus {
+      PENDING
+      APPROVED
+      REJECTED
+      PAID
+      REVERSED
+    }
+
+    Commission --> CommissionId
+    Commission --> Money
+    Commission --> PartnerId
+    Commission --> CampaignId
+    Commission --> TrackingId
+    Commission --> CommissionType
+    Commission --> CommissionStatus
+  }
+}
+
+package "PaymentProcessing Context" as PP {
+
+  package "Payment Aggregate" as PaymentAgg {
+    class Payment <<Aggregate Root>> {
+      - paymentId: PaymentId
+      - amount: Money
+      - beneficiaryPartnerId: PartnerId
+      - paymentMethod: PaymentMethod
+      - status: PaymentStatus
+      - initiatedAt: Date
+      - completedAt: Date
+      --
+      + initiate()
+      + complete()
+      + fail()
+    }
+
+    class PaymentId <<Value Object>> {
+      - value: String
+    }
+
+    enum PaymentMethod {
+      BANK_TRANSFER
+      PAYPAL
+      STRIPE
+      CHECK
+    }
+
+    enum PaymentStatus {
+      PENDING
+      PROCESSING
+      COMPLETED
+      FAILED
+      CANCELLED
+    }
+
+    Payment --> PaymentId
+    Payment --> Money
+    Payment --> PartnerId
+    Payment --> PaymentMethod
+    Payment --> PaymentStatus
+  }
+}
+
+package "PartnerManagement Context" as PM {
+
+  package "Partner Aggregate" as PartnerAgg {
+    class Partner <<Aggregate Root>> {
+      - partnerId: PartnerId
+      - partnerType: PartnerType
+      - businessName: String
+      - contactInfo: ContactInfo
+      - status: PartnerStatus
+      - verificationLevel: VerificationLevel
+      - estimatedMonthlyReach: String
+      --
+      + register()
+      + verify()
+      + updateTerms()
+      + suspend()
+    }
+
+    class ContactInfo <<Value Object>> {
+      - email: String
+      - phone: String
+      - businessAddress: String
+    }
+
+    enum PartnerType {
+      AFFILIATE
+      CONTENT_INFLUENCER
+      CONTENT_CREATOR
+      AGENCY
+      B2B_PARTNER
+    }
+
+    enum PartnerStatus {
+      PENDING
+      ACTIVE
+      SUSPENDED
+      TERMINATED
+    }
+
+    enum VerificationLevel {
+      UNVERIFIED
+      EMAIL_VERIFIED
+      BUSINESS_VERIFIED
+      PREMIUM_VERIFIED
+    }
+
+    Partner --> PartnerId
+    Partner --> PartnerType
+    Partner --> ContactInfo
+    Partner --> PartnerStatus
+    Partner --> VerificationLevel
+  }
+
+  package "PartnerAcceptanceTerms Aggregate" as TermsAgg {
+    class PartnerAcceptanceTerms <<Aggregate Root>> {
+      - partnerId: PartnerId
+      - commissionType: CommissionType
+      - commissionRate: BigDecimal
+      - cookieDurationDays: Int
+      - promotionalMethods: String
+      --
+      + updateTerms()
+      + validate()
+    }
+
+    PartnerAcceptanceTerms --> PartnerId
+    PartnerAcceptanceTerms --> CommissionType
+  }
+}
+
+package "ComplianceMonitoring Context" as CMon {
+
+  package "ComplianceCase Aggregate" as CaseAgg {
+    class ComplianceCase <<Aggregate Root>> {
+      - caseId: CaseId
+      - subjectPartnerId: PartnerId
+      - complianceType: ComplianceType
+      - riskLevel: RiskLevel
+      - status: CaseStatus
+      - createdAt: Date
+      - resolvedAt: Date
+      --
+      + investigate()
+      + resolve()
+      + escalate()
+    }
+
+    class CaseId <<Value Object>> {
+      - value: String
+    }
+
+    enum ComplianceType {
+      FRAUD_DETECTION
+      TAX_COMPLIANCE
+      GDPR_COMPLIANCE
+      PAYMENT_COMPLIANCE
+    }
+
+    enum RiskLevel {
+      RISK_LOW
+      RISK_MEDIUM
+      RISK_HIGH
+      CRITICAL
+    }
+
+    enum CaseStatus {
+      OPEN
+      INVESTIGATING
+      RESOLVED
+      ESCALATED
+    }
+
+    ComplianceCase --> CaseId
+    ComplianceCase --> PartnerId
+    ComplianceCase --> ComplianceType
+    ComplianceCase --> RiskLevel
+    ComplianceCase --> CaseStatus
+  }
+
+  package "ComplianceEvidence Aggregate" as EvidenceAgg {
+    class ComplianceEvidence <<Aggregate Root>> {
+      - caseId: CaseId
+      - evidenceType: EvidenceType
+      - evidenceDescription: String
+      - collectedAt: Date
+      --
+      + collect()
+      + validate()
+    }
+
+    enum EvidenceType {
+      TRAFFIC_PATTERN
+      FINANCIAL_RECORD
+      USER_BEHAVIOR
+      CONTENT_VIOLATION
+    }
+
+    ComplianceEvidence --> CaseId
+    ComplianceEvidence --> EvidenceType
+  }
+}
+
+' Cross-Context Relationships (Event Flow)
+Campaign ..> TrackingEvent : "generates events"
+TrackingEvent ..> Commission : "triggers calculation"
+Commission ..> Payment : "initiates payment"
+Partner ..> Campaign : "participates in"
+ComplianceCase ..> Partner : "monitors"
+
+note top of Campaign : "Aggregate Root manages\ncampaign lifecycle"
+note top of TrackingEvent : "Captures user interactions\nfor attribution"
+note top of Commission : "Calculates partner\ncompensation"
+note top of Payment : "Processes financial\ntransactions"
+note top of Partner : "Manages partner\nrelationships"
+note top of ComplianceCase : "Ensures regulatory\ncompliance"
+
+@enduml
