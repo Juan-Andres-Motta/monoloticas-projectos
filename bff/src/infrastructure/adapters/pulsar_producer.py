@@ -2,8 +2,14 @@ import pulsar
 import logging
 from pulsar.schema import AvroSchema
 from src.domain.entities.partner import Partner
+from src.domain.entities.payment import Payment
 from src.domain.ports.event_publisher import EventPublisher
-from .schemas import PartnerRecord, AcceptanceTermsRecord, TrackingEventRecord
+from .schemas import (
+    PartnerRecord,
+    AcceptanceTermsRecord,
+    TrackingEventRecord,
+    PaymentRecord,
+)
 from .campaign_schemas import (
     CampaignRecord,
     CampaignPartnerAssociationRecord,
@@ -24,6 +30,7 @@ class PulsarEventPublisher(EventPublisher):
         content_topic: str,
         tracking_topic: str,
         fail_topic: str,
+        payment_topic: str,
         token: str = "",
     ):
         self.pulsar_service_url = pulsar_service_url
@@ -33,6 +40,7 @@ class PulsarEventPublisher(EventPublisher):
         self.content_topic = content_topic
         self.tracking_topic = tracking_topic
         self.fail_topic = fail_topic
+        self.payment_topic = payment_topic
         self.token = token
         self.client = None
         self.partner_producer = None
@@ -41,6 +49,7 @@ class PulsarEventPublisher(EventPublisher):
         self.content_producer = None
         self.tracking_producer = None
         self.fail_producer = None
+        self.payment_producer = None
 
     async def connect(self):
         logger.info(f"Connecting to Pulsar at {self.pulsar_service_url}")
@@ -69,8 +78,11 @@ class PulsarEventPublisher(EventPublisher):
         self.fail_producer = self.client.create_producer(
             self.fail_topic, schema=AvroSchema(FailTrackingEventRecord)
         )
+        self.payment_producer = self.client.create_producer(
+            self.payment_topic, schema=AvroSchema(PaymentRecord)
+        )
         logger.info(
-            f"Producers created for topics: {self.partner_topic}, {self.campaign_topic}, {self.association_topic}, {self.content_topic}, {self.tracking_topic}, {self.fail_topic}"
+            f"Producers created for topics: {self.partner_topic}, {self.campaign_topic}, {self.association_topic}, {self.content_topic}, {self.tracking_topic}, {self.fail_topic}, {self.payment_topic}"
         )
 
     async def publish_partner_event(self, partner: Partner) -> None:
@@ -141,6 +153,19 @@ class PulsarEventPublisher(EventPublisher):
         self.fail_producer.send(record)
         logger.info(f"Fail event sent for tracking_id: {tracking_id}")
 
+    async def publish_payment_event(self, payment: Payment) -> None:
+        record = PaymentRecord(
+            amount=payment.amount,
+            currency=payment.currency,
+            payment_method=payment.payment_method,
+            account_details=payment.account_details,
+            user_id=payment.user_id,
+        )
+        self.payment_producer.send(record)
+        logger.info(
+            f"Event sent for payment: {payment.user_id} - {payment.amount} {payment.currency}"
+        )
+
     async def disconnect(self):
         if self.partner_producer:
             self.partner_producer.close()
@@ -154,6 +179,8 @@ class PulsarEventPublisher(EventPublisher):
             self.tracking_producer.close()
         if self.fail_producer:
             self.fail_producer.close()
+        if self.payment_producer:
+            self.payment_producer.close()
         if self.client:
             self.client.close()
         logger.info("Pulsar producers disconnected")

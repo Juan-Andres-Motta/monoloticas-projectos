@@ -19,3 +19,11 @@ class TrackingEventRecord(Record):
     campaign_id = String()
     event_type = String()
     timestamp = String()  # ISO string
+
+
+class PaymentRecord(Record):
+    amount = Float()
+    currency = String()
+    payment_method = String()
+    account_details = String()  # JSON string
+    user_id = String()
